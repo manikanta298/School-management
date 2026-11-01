@@ -1,0 +1,21 @@
+import { z } from 'zod';
+export const id=z.uuid();
+const text=max=>z.string().trim().max(max).regex(/^[^<>\x00-\x1f]*$/u);
+const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>{const d=new Date(v+'T00:00:00Z');return v.slice(0,4)>='0001'&&!Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v;},'Invalid calendar date');
+const version=z.number().int().min(1).max(2147483646);
+const time=z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+const endTime=z.string().regex(/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/);
+export const minute=v=>{const [h,m]=v.split(':').map(Number);return h*60+m;};
+const fields={section_id:id,assignment_id:id,room_id:id.nullable().optional().transform(v=>v??null),weekday:z.number().int().min(1).max(7),start_time:time,end_time:endTime,effective_from:date,effective_to:date,active:z.boolean().default(true),change_note:text(200).nullable().optional().transform(v=>v||null)};
+const valid=s=>s.refine(v=>v.effective_to>=v.effective_from&&minute(v.end_time)>minute(v.start_time),{message:'End date/time must follow start',path:['end_time']});
+export const create=valid(z.object(fields).strict());
+export const update=valid(z.object({...fields,expected_version:version}).strict());
+export const deactivate=z.object({expected_version:version,reason:text(200).min(3)}).strict();
+const roomFields={name:text(100).min(1),location:text(200).nullable().optional().transform(v=>v||null),active:z.boolean().default(true)};
+export const roomCreate=z.object(roomFields).strict();
+export const roomUpdate=z.object({...roomFields,expected_version:version}).strict();
+const paging={limit:z.coerce.number().int().min(1).max(100).default(25),offset:z.coerce.number().int().min(0).default(0)};
+export const page=z.object(paging).strict();
+export const list=z.object({...paging,section_id:id.optional(),teacher_id:id.optional(),room_id:id.optional(),academic_year_id:id.optional(),student_id:id.optional(),weekday:z.coerce.number().int().min(1).max(7).optional(),week_start:date.refine(v=>new Date(v+'T00:00:00Z').getUTCDay()===1,'Week start must be Monday').optional(),include_inactive:z.enum(['true','false']).default('false')}).strict();
+
+export const assignmentQuery=z.object({...paging,class_id:id.optional()}).strict();

@@ -11,7 +11,7 @@ test('real migration runner upgrades once and safely repeats',async()=>{
   await import('../database/migrate.js?first');
   await query("INSERT INTO academic_years(name,start_date,end_date) VALUES($1,$2,$3)",['Persisted year','2026-01-01','2026-12-31']);
   await import('../database/migrate.js?repeat');
-  const migrations=await query('SELECT name FROM schema_migrations ORDER BY name');assert.deepEqual(migrations.rows.map(r=>r.name),['001_auth.sql','002_academic.sql','003_students_parents.sql','004_teachers.sql','005_attendance.sql','006_fees.sql','007_exams.sql']);
+  const migrations=await query('SELECT name FROM schema_migrations ORDER BY name');assert.deepEqual(migrations.rows.map(r=>r.name),['001_auth.sql','002_academic.sql','003_students_parents.sql','004_teachers.sql','005_attendance.sql','006_fees.sql','007_exams.sql','008_timetable.sql']);
   const data=await query('SELECT name FROM academic_years');assert.equal(data.rows[0].name,'Persisted year');
  }finally{await db.close();await originalEnd();}
 });
