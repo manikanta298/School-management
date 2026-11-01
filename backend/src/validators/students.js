@@ -1,0 +1,15 @@
+import { z } from 'zod';
+const text=z.string().trim().max(500).regex(/^[^<>\x00-\x08\x0b\x0c\x0e-\x1f]*$/u);
+const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>{const d=new Date(v+'T00:00:00Z');return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v;},'Invalid calendar date');
+const optionalText=text.nullable().optional().transform(v=>v||null);
+const studentFields={admission_number:z.string().trim().toUpperCase().regex(/^[A-Z0-9_-]{1,30}$/),admission_date:date,date_of_birth:date.nullable().optional().transform(v=>v??null),address:optionalText};
+const parentFields={phone:z.string().trim().regex(/^[+0-9() .-]{7,30}$/).nullable().optional().transform(v=>v??null),address:optionalText};
+const studentSchema=s=>s.refine(v=>!v.date_of_birth||v.date_of_birth<=v.admission_date,{message:'Birth date must be on or before admission',path:['date_of_birth']});
+export const studentCreate=studentSchema(z.object({user_id:z.uuid(),...studentFields}).strict());
+export const studentUpdate=studentSchema(z.object(studentFields).strict());
+export const parentCreate=z.object({user_id:z.uuid(),...parentFields}).strict();
+export const parentUpdate=z.object(parentFields).strict();
+export const link=z.object({parent_id:z.uuid(),relationship:z.enum(['mother','father','guardian','other'])}).strict();
+export const enrollment=z.object({academic_year_id:z.uuid(),section_id:z.uuid(),enrolled_on:date,status:z.enum(['active','withdrawn','completed']).default('active')}).strict();
+export const id=z.uuid();
+export const listQuery=z.object({limit:z.coerce.number().int().min(1).max(100).default(25),offset:z.coerce.number().int().min(0).default(0),q:z.string().trim().max(100).default(''),parent_id:z.uuid().optional(),academic_year_id:z.uuid().optional(),section_id:z.uuid().optional()}).strict();
