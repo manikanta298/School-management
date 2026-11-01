@@ -1,0 +1,11 @@
+import * as service from '../services/students.js';
+export const list=kind=>async(req,res)=>res.json({items:await service.list(kind,req.user,req.directoryQuery)});
+export const find=kind=>async(req,res)=>res.json({item:await service.find(kind,req.user,req.params.id)});
+export const save=kind=>async(req,res)=>res.status(req.params.id?200:201).json({item:await service.save(kind,req.user,req.params.id,req.body)});
+export const remove=kind=>async(req,res)=>{await service.remove(kind,req.params.id);res.status(204).end();};
+export const links=async(req,res)=>res.json({items:await service.links(req.user,req.params.id,req.directoryQuery)});
+export const addLink=async(req,res)=>res.status(201).json({item:await service.addLink(req.user,req.params.id,req.body)});
+export const removeLink=async(req,res)=>{await service.removeLink(req.params.id,req.params.parentId);res.status(204).end();};
+export const enrollments=async(req,res)=>res.json({items:await service.enrollments(req.user,req.params.id,req.directoryQuery)});
+export const saveEnrollment=async(req,res)=>res.status(req.params.enrollmentId?200:201).json({item:await service.saveEnrollment(req.user,req.params.id,req.params.enrollmentId,req.body)});
+export const removeEnrollment=async(req,res)=>{await service.removeEnrollment(req.params.id,req.params.enrollmentId);res.status(204).end();};
