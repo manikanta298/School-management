@@ -1,6 +1,6 @@
 # School Management — React, Express and PostgreSQL
 
-Modules 1–3: Auth & Users, Academic Setup, and Students & Parents. Further modules wait for testing confirmation. Existing Laravel source is preserved; its original setup is in `readme.md` and `legacy-laravel.env.example`. The new stack does not use the root Laravel package.json.
+Modules 1–4: Auth & Users, Academic Setup, Students & Parents, and Teachers. Further modules wait for testing confirmation. Existing Laravel source is preserved; its original setup is in `readme.md` and `legacy-laravel.env.example`. The new stack does not use the root Laravel package.json.
 
 ## Requirements
 
@@ -43,7 +43,7 @@ Back up PostgreSQL before migrations; take regular tested backups of the school_
 
 Passwords use bcrypt cost 12; length is checked in UTF-8 bytes to avoid bcrypt truncation. Email is trimmed and normalized; unknown input fields are rejected. Names reject control characters/HTML markup, and React escapes displayed text. All user values use parameterized queries. Access JWTs last 15 minutes and remain only in browser memory. Refresh tokens are random, stored as SHA-256 hashes, rotated on use, and live in HttpOnly SameSite=Strict cookies (Secure in production). Refresh/logout require the exact configured Origin to block CSRF. Refresh replay revokes all sessions for that user. Password change/reset revokes all sessions immediately; authentication checks the live database role and session on every protected request. Logout revokes the current session. Sessions expire after seven days; expired/revoked database records can be periodically purged by a DBA.
 
-There is no public registration. Admins create accounts and can reset passwords after verifying identity, then share credentials through a secure channel. Password reset currently uses the administrator workflow; email recovery is not implemented. Academic Setup adds years, terms, classes, sections and subjects. Students & Parents adds student/parent profiles, family links, and section enrollment. Fees, attendance, teacher assignments, and exams remain for later modules.
+There is no public registration. Admins create accounts and can reset passwords after verifying identity, then share credentials through a secure channel. Password reset currently uses the administrator workflow; email recovery is not implemented. Academic Setup adds years, terms, classes, sections and subjects. Students & Parents adds student/parent profiles, family links, and section enrollment. Teachers adds staff profiles, class/subject assignments, and private assignment rosters. Fees, attendance, timetable scheduling, and exams remain for later modules.
 
 ## API
 
@@ -92,8 +92,12 @@ Never force-add .env or commit real credentials. Dependencies are locked separat
 
 ## Module 2: Academic Setup
 
-Admins manage academic years, terms, classes, sections and the subject catalog from Academic setup. All authenticated roles can view them. Run migration 002_academic.sql using `npm run migrate`; do not re-import schema.sql. Full schema is kept current through Module 3. See [upgrade steps, API reference, acceptance checklist and git commands](docs/testing/academic.md). Module 3 is implemented below.
+Admins manage academic years, terms, classes, sections and the subject catalog from Academic setup. All authenticated roles can view them. Run migration 002_academic.sql using `npm run migrate`; do not re-import schema.sql. Full schema is kept current through Module 4. See [upgrade steps, API reference, acceptance checklist and git commands](docs/testing/academic.md). Module 3 is implemented below.
 
 ## Module 3: Students & Parents
 
-Admins manage student/parent profiles, family links and yearly section enrollment. Students see only their own records; parents see only linked children and their own parent profile. Teacher access waits for assignment-based permissions. Run `npm run migrate` to apply 003_students_parents.sql. See [schema details, API reference, upgrade steps, acceptance tests and git commands](docs/testing/students-parents.md). Module 4 (Teachers) waits for testing confirmation.
+Admins manage student/parent profiles, family links and yearly section enrollment. Students see only their own records; parents see only linked children and their own parent profile. Teachers use dedicated assignment roster endpoints; student/parent profile APIs remain private. Run `npm run migrate` to apply 003_students_parents.sql. See [schema details, API reference, upgrade steps, acceptance tests and git commands](docs/testing/students-parents.md). Module 4 is implemented below.
+
+## Module 4: Teachers
+
+Admins manage teacher profiles, class-teacher and subject-teacher assignments. Teachers see only their own profiles, assignments, and active student rosters for their assigned classes; private student/family data is excluded. Inactive employment or removed assignments revoke roster access. Run `npm run migrate` to apply 004_teachers.sql. See [schema changes, API reference, upgrade steps, acceptance tests and git commands](docs/testing/teachers.md). Module 5 (Attendance) waits for testing confirmation.
