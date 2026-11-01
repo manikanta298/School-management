@@ -1,0 +1,12 @@
+import { z } from 'zod';
+export const id=z.uuid();
+const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>{const d=new Date(v+'T00:00:00Z');return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v;},'Invalid calendar date');
+const text=z.string().trim().max(200).regex(/^[^<>\x00-\x1f]*$/u);
+const paging={limit:z.coerce.number().int().min(1).max(100).default(25),offset:z.coerce.number().int().min(0).default(0)};
+const range={from:date,to:date};
+const validRange=s=>s.refine(v=>v.to>=v.from&&(Date.parse(v.to)-Date.parse(v.from))/86400000<=365,{message:'Choose up to 366 inclusive days',path:['to']});
+export const sectionsQuery=z.object({...paging,academic_year_id:id.optional()}).strict();
+export const registerQuery=z.object({...paging,section_id:id,date}).strict();
+export const summaryQuery=validRange(z.object({section_id:id,...range}).strict());
+export const studentQuery=validRange(z.object({...paging,...range}).strict());
+export const save=z.object({section_id:id,date,expected_version:z.number().int().min(0).max(2147483646),correction_reason:text.nullable().optional().transform(v=>v||null),entries:z.array(z.object({student_id:id,status:z.enum(['present','absent','late','excused','void']),note:text.nullable().optional().transform(v=>v||null)}).strict()).min(1).max(100)}).strict().refine(v=>new Set(v.entries.map(e=>e.student_id)).size===v.entries.length,{message:'Duplicate student IDs in one batch',path:['entries']});

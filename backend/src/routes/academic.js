@@ -15,6 +15,6 @@ academicRouter.delete('/:resource/:id',authorize('admin'),c.remove);
 academicRouter.use((err,_req,res,next)=>{
  if(err.code==='23505')return res.status(409).json({message:'Duplicate name/code, or another academic year is already current'});
  if(err.code==='23503')return res.status(409).json({message:'Referenced parent does not exist, or this record has dependent records'});
- if(err.code==='23514')return res.status(400).json({message:'Invalid dates or capacity. Terms, enrollments and teacher assignments must fit the year; terms cannot overlap and capacity cannot be below active enrollments.'});
+ if(err.code==='23514')return res.status(400).json({message:'Invalid dates or capacity. Terms, enrollments, attendance and teacher assignments must fit the year; terms cannot overlap and capacity cannot be below active enrollments.'});
  next(err);
 });
