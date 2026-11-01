@@ -9,6 +9,7 @@ import { academicRouter } from './routes/academic.js';
 import { studentsRouter,parentsRouter } from './routes/students.js';
 import { teachersRouter } from './routes/teachers.js';
 import { attendanceRouter } from './routes/attendance.js';
+import { feesRouter } from './routes/fees.js';
 export const app=express();
 app.set('trust proxy',env.TRUST_PROXY);app.disable('x-powered-by');
 app.use(helmet());app.use(cors({origin:env.FRONTEND_ORIGIN,credentials:true}));
@@ -16,6 +17,7 @@ app.use(rateLimit({windowMs:60000,limit:120,standardHeaders:'draft-8',legacyHead
 app.use('/api/attendance',express.json({limit:'128kb'}));
 app.use(express.json({limit:'16kb'}));app.use(cookieParser());
 app.get('/api/health',(_req,res)=>res.json({status:'ok'}));
+app.use('/api/fees',feesRouter);
 app.use('/api/attendance',attendanceRouter);
 app.use('/api/teachers',teachersRouter);
 app.use('/api/students',studentsRouter);app.use('/api/parents',parentsRouter);
