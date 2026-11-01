@@ -1,8 +1,17 @@
 import { X509Certificate } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 
 export function databaseOptions(env) {
- if (!env.DATABASE_CA_CERT) return { connectionString: env.DATABASE_URL };
- const ca = env.DATABASE_CA_CERT.replace(/\\n/g, '\n');
+ const file = env.DATABASE_CA_CERT_FILE || (existsSync('/etc/secrets/ca.pem') ? '/etc/secrets/ca.pem' : undefined);
+ let certificate = env.DATABASE_CA_CERT;
+ if (!certificate && file) {
+  try { certificate = readFileSync(file, 'utf8'); } catch {
+   throw new Error('Cannot read database CA file. Check DATABASE_CA_CERT_FILE and secret-file permissions.');
+  }
+  if (!certificate.trim()) throw new Error('Database CA file is empty.');
+ }
+ if (!certificate) return { connectionString: env.DATABASE_URL };
+ const ca = certificate.replace(/\\n/g, '\n');
  try {
   const certificates = ca.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
   if (!certificates?.length) throw new Error();

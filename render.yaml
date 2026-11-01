@@ -18,4 +18,4 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_ORIGIN
-        sync: false
+        value: https://frontend-javx.vercel.app

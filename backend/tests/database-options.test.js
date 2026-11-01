@@ -21,3 +21,21 @@ test('invalid CA and conflicting client certificates fail without leaking values
  assert.throws(() => databaseOptions({DATABASE_URL, DATABASE_CA_CERT:'private-invalid-value'}), error => /DATABASE_CA_CERT/.test(error.message) && !error.message.includes('private-invalid-value'));
  assert.throws(() => databaseOptions({DATABASE_URL:DATABASE_URL+'&sslkey=private', DATABASE_CA_CERT:rootCertificates[0]}), /client-certificate/);
 });
+
+ test('mounted certificate files load securely and invalid paths fail clearly', async () => {
+ const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+ const { join } = await import('node:path');
+ const directory = mkdtempSync(join(process.cwd(), '.ca-test-'));
+ try {
+  const file = join(directory, 'ca.pem');
+  writeFileSync(file, rootCertificates[0]);
+  const options = databaseOptions({DATABASE_URL, DATABASE_CA_CERT_FILE:file});
+  assert.equal(new pg.Client(options).ssl.ca, rootCertificates[0]);
+  assert.equal(options.ssl.rejectUnauthorized, true);
+  assert.throws(() => databaseOptions({DATABASE_URL, DATABASE_CA_CERT_FILE:join(directory, 'absent.pem')}), /Cannot read database CA file/);
+  writeFileSync(file, '');
+  assert.throws(() => databaseOptions({DATABASE_URL, DATABASE_CA_CERT_FILE:file}), /empty/);
+  const inline = databaseOptions({DATABASE_URL, DATABASE_CA_CERT:rootCertificates[0], DATABASE_CA_CERT_FILE:join(directory,'absent.pem')});
+  assert.equal(inline.ssl.ca, rootCertificates[0]);
+ } finally { rmSync(directory, {recursive:true, force:true}); }
+});

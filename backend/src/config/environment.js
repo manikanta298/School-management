@@ -11,6 +11,7 @@ const schema = z.object({
  PORT: z.coerce.number().int().min(1).max(65535).default(4000),
  DATABASE_URL: z.string().url().refine(value => /^postgres(ql)?:/.test(value)),
  DATABASE_CA_CERT: z.string().min(1).optional(),
+ DATABASE_CA_CERT_FILE: z.string().min(1).optional(),
  JWT_SECRET: z.string().refine(strongSecret),
  FRONTEND_ORIGIN: z.string().url().refine(value => {
   const url = new URL(value);

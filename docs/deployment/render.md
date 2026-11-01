@@ -59,3 +59,18 @@ For an external provider using a publicly trusted certificate, use its documente
 Do not set NODE_TLS_REJECT_UNAUTHORIZED=0 or rejectUnauthorized=false. These disable verification instead of fixing trust. No code change can discover the correct private CA or replace a live DATABASE_URL automatically.
 
 References: [Render connection guide](https://render.com/docs/postgresql-creating-connecting), [node-postgres TLS configuration](https://node-postgres.com/features/ssl).
+
+## This project's Vercel frontend and Render API
+
+- Frontend: https://frontend-javx.vercel.app
+- Backend: https://school-management-knrb.onrender.com
+- Frontend proxy health check: https://frontend-javx.vercel.app/api/health
+- Direct backend health check: https://school-management-knrb.onrender.com/api/health
+
+Vercel project Root Directory must be `frontend`, production branch `main`, build command `npm run build`, output `dist`. `frontend/vercel.json` forwards `/api/:path*` to Render before the SPA fallback. Browser calls stay on `/api`; keep VITE_API_BASE set to `/api` (remove any old direct Render API URL override in Vercel's environment). The committed config supplies `/api` for builds, but check for existing dashboard overrides.
+
+On the existing Render backend service set FRONTEND_ORIGIN to `https://frontend-javx.vercel.app`, NODE_ENV to `production`, and TRUST_PROXY to `1`. render.yaml now contains this exact origin; manually created services still need their dashboard setting updated. Never use the backend URL as FRONTEND_ORIGIN. A repository push does not edit an existing service's dashboard environment.
+
+The backend now automatically reads `/etc/secrets/ca.pem` if present, or reads an explicitly configured DATABASE_CA_CERT_FILE. The filename must be exactly `ca.pem`, with no quote; the path has no spaces. DATABASE_CA_CERT (inline PEM) takes precedence over file contents, so remove an obsolete inline value when switching to a file. A file read or certificate validation error stops startup. Use only the matching database provider CA bundle; mounting a file cannot fix an incorrect CA chain.
+
+Pushes to the linked production branch can trigger provider auto-deployments if enabled. After both finish, check both health links, sign in from the frontend, reload to verify refresh, and confirm logout. If direct backend health fails, resolve the database/startup error first. If only the proxy health fails, check Vercel Root Directory and deployment commit. If sign-in succeeds but refresh returns 403, check the exact FRONTEND_ORIGIN and that the proxy preserves the browser Origin header. Do not weaken origin checks to accept arbitrary sites.

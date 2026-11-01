@@ -125,3 +125,5 @@ Admins draft, target, schedule, publish and archive in-app notices. Read acknowl
 ## Render deployment
 
 For missing environment settings during Render startup, follow [the Render setup guide](docs/deployment/render.md). The root `render.yaml` supplies a backend Blueprint; existing services require their environment values to be set in the Render dashboard.
+
+Production URLs: [frontend](https://frontend-javx.vercel.app) · [backend health](https://school-management-knrb.onrender.com/api/health). Vercel deployment config is in `frontend/vercel.json`; set the Vercel project Root Directory to `frontend`.
