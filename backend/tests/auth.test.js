@@ -6,7 +6,7 @@ import request from 'supertest';
 process.env.NODE_ENV='test';process.env.JWT_SECRET='test-secret'.repeat(8);process.env.DATABASE_URL='postgres://test:test@localhost/test';process.env.FRONTEND_ORIGIN='http://localhost:5173';
 const {pool}=await import('../src/config/db.js');
 const db=new PGlite();await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
-const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.affectedRows??r.rows.length};};
+const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};
 pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const password='StrongPassword!123',origin='http://localhost:5173';
