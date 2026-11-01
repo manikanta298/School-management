@@ -40,3 +40,22 @@ The root `render.yaml` defines a backend Docker web service. It prompts for DATA
 4. Sign in from the frontend, reload to exercise cookie refresh, and verify a protected API request succeeds.
 
 The API intentionally refuses to start without a database connection or secure production configuration. This repository change cannot supply your live database credentials; they must be configured in Render.
+
+## Database certificate chain errors
+
+`SELF_SIGNED_CERT_IN_CHAIN` means the database TLS certificate cannot be verified. Retrying the same deployment does not change the trust settings. The sslmode warning is separate from the fatal certificate error.
+
+If your database is **Render PostgreSQL in the same workspace and region**, copy its **Internal Database URL exactly as provided** into DATABASE_URL. Remove manually appended `sslmode=require` / `verify-full` parameters. Render's private-network internal certificates are self-signed and do not support verify-full. Do this only for that private Render connection, not an external database endpoint.
+
+For an **external database or a provider requiring verified TLS**:
+
+1. Download the database CA certificate bundle from your actual database provider's dashboard or official instructions. Do not copy the untrusted certificate from the error or use a made-up certificate.
+2. Add `DATABASE_CA_CERT` to the Render backend Environment and paste the PEM bundle, including BEGIN/END CERTIFICATE lines. Both multiline PEM and literal `\n` line separators are supported.
+3. Keep DATABASE_URL pointed at the provider's hostname. With DATABASE_CA_CERT set, the application explicitly enables TLS and verifies the certificate and hostname; URL SSL switches are removed so they cannot overwrite the trusted CA. URL client-certificate options are rejected rather than discarded.
+4. Save and redeploy. The shared pool configuration applies to both the server and migrations. Check `/api/health` after startup.
+
+For an external provider using a publicly trusted certificate, use its documented endpoint and `sslmode=verify-full`; no custom CA should be necessary. If validation still fails, confirm its required CA chain with the provider.
+
+Do not set NODE_TLS_REJECT_UNAUTHORIZED=0 or rejectUnauthorized=false. These disable verification instead of fixing trust. No code change can discover the correct private CA or replace a live DATABASE_URL automatically.
+
+References: [Render connection guide](https://render.com/docs/postgresql-creating-connecting), [node-postgres TLS configuration](https://node-postgres.com/features/ssl).
