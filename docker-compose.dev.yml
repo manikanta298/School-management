@@ -1,0 +1,25 @@
+services:
+  postgres:
+    ports: ["127.0.0.1:5432:5432"]
+  backend:
+    build:
+      target: development
+    environment:
+      NODE_ENV: development
+      TRUST_PROXY: 0
+    ports: ["127.0.0.1:4000:4000"]
+    volumes:
+      - ./backend:/app
+      - backend_modules:/app/node_modules
+  frontend:
+    build:
+      target: development
+    ports: !override ["127.0.0.1:5173:5173"]
+    environment:
+      API_PROXY_TARGET: http://backend:4000
+    volumes:
+      - ./frontend:/app
+      - frontend_modules:/app/node_modules
+volumes:
+  backend_modules:
+  frontend_modules:

@@ -1,0 +1,17 @@
+import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
+import * as c from '../controllers/auth.js';
+import * as v from '../validators/auth.js';
+import { authenticate,authorize,originGuard } from '../middleware/auth.js';
+export const authRouter=Router(),usersRouter=Router();
+const strict=rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:'draft-8',legacyHeaders:false});
+authRouter.use((_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+authRouter.post('/login',strict,v.validate(v.login),c.login);
+authRouter.post('/refresh',strict,originGuard,c.refresh);
+authRouter.post('/logout',originGuard,c.logout);
+authRouter.get('/me',authenticate,(req,res)=>res.json({user:req.user}));
+authRouter.post('/change-password',strict,authenticate,v.validate(v.changePassword),c.changePassword);
+usersRouter.use(authenticate,authorize('admin'));
+usersRouter.get('/',c.listUsers);
+usersRouter.post('/',v.validate(v.createUser),c.createUser);
+usersRouter.post('/:id/reset-password',strict,v.validate(v.resetPassword),c.resetPassword);
