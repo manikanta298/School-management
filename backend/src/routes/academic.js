@@ -1,0 +1,20 @@
+import { Router } from 'express';
+import { authenticate,authorize } from '../middleware/auth.js';
+import { schemas,identifier,pagination } from '../validators/academic.js';
+import * as c from '../controllers/academic.js';
+export const academicRouter=Router();
+academicRouter.use(authenticate,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+academicRouter.param('resource',(req,res,next,value)=>Object.hasOwn(schemas,value)?next():res.status(404).json({message:'Unknown academic resource'}));
+academicRouter.param('id',(req,res,next,value)=>identifier.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));
+const validate=(req,res,next)=>{const result=schemas[req.params.resource].safeParse(req.body);if(!result.success)return res.status(400).json({message:'Invalid input',errors:result.error.flatten().fieldErrors});req.body=result.data;next();};
+academicRouter.get('/:resource',(req,res,next)=>{const result=pagination.safeParse(req.query);if(!result.success)return res.status(400).json({message:'Invalid query'});req.academicQuery=result.data;next();},c.list);
+academicRouter.get('/:resource/:id',c.find);
+academicRouter.post('/:resource',authorize('admin'),validate,c.create);
+academicRouter.put('/:resource/:id',authorize('admin'),validate,c.update);
+academicRouter.delete('/:resource/:id',authorize('admin'),c.remove);
+academicRouter.use((err,_req,res,next)=>{
+ if(err.code==='23505')return res.status(409).json({message:'Duplicate name/code, or another academic year is already current'});
+ if(err.code==='23503')return res.status(409).json({message:'Referenced parent does not exist, or this record has dependent records'});
+ if(err.code==='23514')return res.status(400).json({message:'Invalid dates or capacity. Terms must fit the year and must not overlap.'});
+ next(err);
+});
