@@ -1,6 +1,6 @@
 # School Management — React, Express and PostgreSQL
 
-Modules 1–6: Auth & Users, Academic Setup, Students & Parents, Teachers, Attendance, and Fees. Further modules wait for testing confirmation. Existing Laravel source is preserved; its original setup is in `readme.md` and `legacy-laravel.env.example`. The new stack does not use the root Laravel package.json.
+Modules 1–8: Auth & Users, Academic Setup, Students & Parents, Teachers, Attendance, Fees, Exams & Results, and Timetable. Further modules wait for testing confirmation. Existing Laravel source is preserved; its original setup is in `readme.md` and `legacy-laravel.env.example`. The new stack does not use the root Laravel package.json.
 
 ## Requirements
 
@@ -43,7 +43,7 @@ Back up PostgreSQL before migrations; take regular tested backups of the school_
 
 Passwords use bcrypt cost 12; length is checked in UTF-8 bytes to avoid bcrypt truncation. Email is trimmed and normalized; unknown input fields are rejected. Names reject control characters/HTML markup, and React escapes displayed text. All user values use parameterized queries. Access JWTs last 15 minutes and remain only in browser memory. Refresh tokens are random, stored as SHA-256 hashes, rotated on use, and live in HttpOnly SameSite=Strict cookies (Secure in production). Refresh/logout require the exact configured Origin to block CSRF. Refresh replay revokes all sessions for that user. Password change/reset revokes all sessions immediately; authentication checks the live database role and session on every protected request. Logout revokes the current session. Sessions expire after seven days; expired/revoked database records can be periodically purged by a DBA.
 
-There is no public registration. Admins create accounts and can reset passwords after verifying identity, then share credentials through a secure channel. Password reset currently uses the administrator workflow; email recovery is not implemented. Academic Setup adds years, terms, classes, sections and subjects. Students & Parents adds student/parent profiles, family links, and section enrollment. Teachers adds staff profiles, class/subject assignments, and private assignment rosters. Attendance adds daily section registers, audited corrections and scoped reports. Fees adds charge structures, fixed invoices, manual payment records and currency-separated balances. Timetable scheduling and exams remain for later modules.
+There is no public registration. Admins create accounts and can reset passwords after verifying identity, then share credentials through a secure channel. Password reset currently uses the administrator workflow; email recovery is not implemented. Academic Setup adds years, terms, classes, sections and subjects. Students & Parents adds student/parent profiles, family links, and section enrollment. Teachers adds staff profiles, class/subject assignments, and private assignment rosters. Attendance adds daily section registers, audited corrections and scoped reports. Fees adds charge structures, fixed invoices, manual payment records and currency-separated balances. Exams & Results adds candidate registration, subject papers, grading, audited marks and published report cards. Timetable adds weekly section schedules, optional rooms, conflict checks and scoped views. Notices & Dashboards remains for the next module.
 
 ## API
 
@@ -92,7 +92,7 @@ Never force-add .env or commit real credentials. Dependencies are locked separat
 
 ## Module 2: Academic Setup
 
-Admins manage academic years, terms, classes, sections and the subject catalog from Academic setup. All authenticated roles can view them. Run migration 002_academic.sql using `npm run migrate`; do not re-import schema.sql. Full schema is kept current through Module 6. See [upgrade steps, API reference, acceptance checklist and git commands](docs/testing/academic.md). Module 3 is implemented below.
+Admins manage academic years, terms, classes, sections and the subject catalog from Academic setup. All authenticated roles can view them. Run migration 002_academic.sql using `npm run migrate`; do not re-import schema.sql. Full schema is kept current through Module 8. See [upgrade steps, API reference, acceptance checklist and git commands](docs/testing/academic.md). Module 3 is implemented below.
 
 ## Module 3: Students & Parents
 
@@ -108,4 +108,12 @@ Admins and active class teachers mark daily section registers; subject teachers 
 
 ## Module 6: Fees
 
-Admins manage class/year fee structures, issue invoices and manually record or reverse payments. Students and parents see only their authorized invoices, receipts and balances. Money uses integer minor units, invoices preserve charge snapshots, and retry keys/audit events protect payment records. No online payment processing or bank refunds occur. Run `npm run migrate` for 006_fees.sql. See [schema changes, API reference, upgrade steps, testing checklist and git commands](docs/testing/fees.md). Module 7 (Exams & Results) waits for testing confirmation.
+Admins manage class/year fee structures, issue invoices and manually record or reverse payments. Students and parents see only their authorized invoices, receipts and balances. Money uses integer minor units, invoices preserve charge snapshots, and retry keys/audit events protect payment records. No online payment processing or bank refunds occur. Run `npm run migrate` for 006_fees.sql. See [schema changes, API reference, upgrade steps, testing checklist and git commands](docs/testing/fees.md). Module 7 is implemented below.
+
+## Module 7: Exams & Results
+
+Admins set up exams, grading scales, papers and candidates. Subject teachers enter versioned marks; class teachers preview full results. Only complete, published results are visible to authorized students/parents. Reopening hides results until audited corrections are republished. Run `npm run migrate` for 007_exams.sql. See [schema changes, grading rules, API reference, upgrade steps, testing checklist and git commands](docs/testing/exams.md). Module 8 is implemented below.
+
+## Module 8: Timetable
+
+Admins create date-limited weekly section sessions using subject-teacher assignments and optional rooms. Database guards reject teacher/section/room conflicts across real occurrences and overlapping years. Teachers see their own sessions; students/parents see their current authorized sections. Versioned edits, inactive history and audits preserve replacements. Run `npm run migrate` for 008_timetable.sql. See [schema changes, API reference, teacher-replacement workflow, upgrade steps, testing checklist and git commands](docs/testing/timetable.md). Module 9 (Notices & Dashboards) waits for testing confirmation.
