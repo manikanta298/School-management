@@ -1,0 +1,18 @@
+import { z } from 'zod';
+export const id=z.uuid();
+const line=max=>z.string().trim().max(max).regex(/^[^<>\x00-\x1f]*$/u);
+const body=z.string().trim().min(1).max(5000).regex(/^[^<>\x00-\x08\x0b\x0c\x0e-\x1f]*$/u);
+const timestamp=z.iso.datetime({offset:true}).refine(v=>v.slice(0,4)>='0001'&&!/\.\d{4}/.test(v)&&Number.isFinite(Date.parse(v)),'Use a valid timestamp with at most millisecond precision').transform(v=>new Date(v).toISOString()).refine(v=>/^\d{4}-/.test(v)&&v.slice(0,4)>='0001','Timestamp outside supported calendar');
+const version=z.number().int().min(1).max(2147483646);
+const fields={title:line(150).min(1),body,audience:z.enum(['all','admin','teacher','student','parent']).default('all'),class_id:id.nullable().optional().transform(v=>v??null),section_id:id.nullable().optional().transform(v=>v??null),priority:z.enum(['normal','important','urgent']).default('normal'),available_from:timestamp,expires_at:timestamp.nullable().optional().transform(v=>v??null)};
+const valid=s=>s.refine(v=>(!v.section_id||v.class_id)&&(!v.expires_at||Date.parse(v.expires_at)>Date.parse(v.available_from)),{message:'Select a class for section scope and expiry after availability',path:['expires_at']});
+export const create=valid(z.object(fields).strict());
+export const update=valid(z.object({...fields,audience:z.enum(['all','admin','teacher','student','parent']),class_id:id.nullable(),section_id:id.nullable(),priority:z.enum(['normal','important','urgent']),expires_at:timestamp.nullable(),expected_version:version}).strict());
+export const publish=z.object({expected_version:version}).strict();
+export const action=z.object({expected_version:version,reason:line(200).min(3)}).strict();
+export const acknowledge=z.object({content_revision:version}).strict();
+const paging={limit:z.coerce.number().int().min(1).max(100).default(25),offset:z.coerce.number().int().min(0).default(0)};
+export const page=z.object(paging).strict();
+export const list=z.object({...paging,q:line(100).default(''),unread_only:z.enum(['true','false']).default('false'),priority:z.enum(['normal','important','urgent']).optional()}).strict();
+export const manage=z.object({...paging,q:line(100).default(''),status:z.enum(['draft','published','archived']).optional(),class_id:id.optional(),priority:z.enum(['normal','important','urgent']).optional()}).strict();
+export const readers=z.object({...paging,content_revision:z.coerce.number().int().min(1).max(2147483647).optional()}).strict();
