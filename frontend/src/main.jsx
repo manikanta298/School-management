@@ -4,6 +4,7 @@ import { api,restore,clearToken } from './api/client';
 import './style.css';
 import AcademicSetup from './pages/AcademicSetup';
 import StudentsParents from './pages/StudentsParents';
+import Teachers from './pages/Teachers';
 function App(){
  const [user,setUser]=useState(null),[loading,setLoading]=useState(true),[page,setPage]=useState('dashboard'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[users,setUsers]=useState([]),[offset,setOffset]=useState(0);
  useEffect(()=>{restore().then(d=>setUser(d.user)).catch(()=>{}).finally(()=>setLoading(false));},[]);
@@ -18,7 +19,8 @@ function App(){
  if(loading)return <main><p role="status">Loading your session…</p></main>;
  return <><header><strong>School Management</strong>{user&&<span>{user.name} · {user.role} <button onClick={logout} disabled={busy}>Sign out</button></span>}</header><main>
  {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status" className="notice">{notice}</p>}
- {!user?<section className="login"><p className="eyebrow">SCHOOL PORTAL</p><h1>Welcome back</h1><p>Sign in with your school account.</p><form onSubmit={login}>{field('email','Email','email')}<label>Password<input name="password" type="password" required autoComplete="current-password"/></label><button disabled={busy}>{busy?'Signing in…':'Sign in'}</button></form><p>Need an account or password reset? Contact your school administrator.</p></section>:<><nav>{user.role!=='teacher'&&<button onClick={()=>setPage('students')}>{user.role==='admin'?'Students & Parents':user.role==='parent'?'My family':'My profile'}</button>}<button onClick={()=>setPage('academic')}>Academic setup</button><button onClick={()=>setPage('dashboard')}>Dashboard</button><button onClick={()=>setPage('password')}>Change password</button>{user.role==='admin'&&<button onClick={()=>run(async()=>{await loadUsers();setPage('users');})}>Manage users</button>}</nav>
+ {!user?<section className="login"><p className="eyebrow">SCHOOL PORTAL</p><h1>Welcome back</h1><p>Sign in with your school account.</p><form onSubmit={login}>{field('email','Email','email')}<label>Password<input name="password" type="password" required autoComplete="current-password"/></label><button disabled={busy}>{busy?'Signing in…':'Sign in'}</button></form><p>Need an account or password reset? Contact your school administrator.</p></section>:<><nav>{['admin','teacher'].includes(user.role)&&<button onClick={()=>setPage('teachers')}>{user.role==='admin'?'Teachers':'My teaching'}</button>}{user.role!=='teacher'&&<button onClick={()=>setPage('students')}>{user.role==='admin'?'Students & Parents':user.role==='parent'?'My family':'My profile'}</button>}<button onClick={()=>setPage('academic')}>Academic setup</button><button onClick={()=>setPage('dashboard')}>Dashboard</button><button onClick={()=>setPage('password')}>Change password</button>{user.role==='admin'&&<button onClick={()=>run(async()=>{await loadUsers();setPage('users');})}>Manage users</button>}</nav>
+ {page==='teachers'&&['admin','teacher'].includes(user.role)&&<Teachers user={user}/>}
  {page==='students'&&user.role!=='teacher'&&<StudentsParents user={user}/>}
  {page==='academic'&&<AcademicSetup user={user}/>}
  {page==='dashboard'&&<section><p className="eyebrow">{user.role.toUpperCase()} PORTAL</p><h1>Hello, {user.name}</h1><p>Your account is ready. Use the navigation to view your academic and profile records.</p><div className="card"><h2>Account details</h2><p>{user.email}</p><p>Role: {user.role}</p></div></section>}

@@ -26,7 +26,7 @@ Profiles reuse names/emails from Auth accounts. Their account association is imm
 | parent | Linked children only | Own profile only | Own link for an authorized child | None |
 | teacher | No access yet | No access | No access | None |
 
-Teachers will receive assignment-based access in the Teachers module. Unauthorized individual record IDs return 404, so changing IDs does not reveal other families. Parent/student responses never include password hashes or account roles from profile storage. Guardian lists expose names/relationships, not email, phone or address. Unlinking a parent immediately removes access to that child. Family information responses use Cache-Control: no-store.
+Module 4 now provides teachers with dedicated minimal roster endpoints for their assigned classes. Student and parent profile endpoints described here remain forbidden to teachers. Unauthorized individual record IDs return 404, so changing IDs does not reveal other families. Parent/student responses never include password hashes or account roles from profile storage. Guardian lists expose names/relationships, not email, phone or address. Unlinking a parent immediately removes access to that child. Family information responses use Cache-Control: no-store.
 
 ## Upgrade
 
