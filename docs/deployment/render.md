@@ -84,3 +84,19 @@ After deployment, expect `Database migrations complete` before `API listening`. 
 If no administrator exists yet, set ADMIN_EMAIL, ADMIN_NAME and a strong ADMIN_PASSWORD securely in Render, then run `npm run seed:admin` from the backend runtime shell. This command does not reset existing accounts. Do not commit passwords or create a public signup/admin bootstrap endpoint.
 
 If login still returns 500, check the backend log entry `Request failed: <code>` at the same time as the request. For example, 42P01 indicates a missing table; 42703 a missing column; 42501 a database permission problem. Migration-managed databases must not be replaced with unrelated legacy schemas. Share only the error code/message, never connection strings or secrets.
+
+## Login returns 401
+
+401 from login means the account was not found, the password did not match, or the account is inactive. This is intentionally different from a server error and does not disclose which check failed. There is no built-in default administrator password.
+
+For a new deployment, set all three backend Render environment variables privately:
+
+- ADMIN_NAME: your administrator's display name.
+- ADMIN_EMAIL: the email you will use on the login form.
+- ADMIN_PASSWORD: a unique password with at least 12 characters and at most 72 UTF-8 bytes.
+
+Save and redeploy. Startup applies migrations, then creates this administrator if that email is absent. Look for `Administrator created` in backend logs, then sign in using exactly those credentials. Existing accounts are never modified or reactivated by startup or seed:admin. Do not put administrator credentials into Vercel or VITE variables.
+
+After bootstrap, remove all three ADMIN_* variables together from Render and redeploy. The database account remains. Partial or invalid bootstrap settings fail startup with a redacted error; no passwords are logged.
+
+If logs say the account already exists and login is still rejected, changing ADMIN_PASSWORD will not reset its password. Use another signed-in administrator's Manage users password-reset action, or ask the database/service owner to perform an authorized account recovery. Do not remove authentication checks or recreate the database.

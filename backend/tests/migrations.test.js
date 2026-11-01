@@ -4,7 +4,7 @@ import {PGlite} from '@electric-sql/pglite';
 import request from 'supertest';
 process.env.NODE_ENV='test';process.env.JWT_SECRET='migration-test-secret'.repeat(4);process.env.DATABASE_URL='postgres://test:test@localhost/test';process.env.FRONTEND_ORIGIN='http://localhost:5173';
 const {pool}=await import('../src/config/db.js');
-test('real migration runner upgrades once and safely repeats',async()=>{
+test('startup migrates, bootstraps administrator, authenticates and safely repeats',async()=>{
  const db=new PGlite();const originalEnd=pool.end.bind(pool);
  const query=async(text,params)=>{const r=params?await db.query(text,params):(await db.exec(text)).at(-1);return {...r,rowCount:r.rows.length||r.affectedRows||0};};
  pool.query=query;pool.connect=async()=>({query,release(){}});pool.end=async()=>{};
@@ -14,8 +14,18 @@ test('real migration runner upgrades once and safely repeats',async()=>{
   const {app}=await import('../src/app.js');
   const invalid=await request(app).post('/api/auth/login').send({email:'nobody@example.com',password:'NoAccountPassword!123'});
   assert.equal(invalid.status,401);
-  const {hashPassword}=await import('../src/services/auth.js');
-  await query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'admin')",['Admin','startup-admin@example.com',await hashPassword('StartupPassword!123')]);
+  const {bootstrapAdmin}=await import('../database/bootstrap-admin.js');
+  const source={ADMIN_NAME:'Admin',ADMIN_EMAIL:'Startup-Admin@Example.com',ADMIN_PASSWORD:'StartupPassword!123'};
+  assert.equal(await bootstrapAdmin(pool,{}),'not-configured');
+  await assert.rejects(bootstrapAdmin(pool,{ADMIN_EMAIL:'admin@example.com',ADMIN_PASSWORD:'private-invalid'}), error => !error.message.includes('private-invalid'));
+  assert.equal(await bootstrapAdmin(pool,source),'created');
+  assert.equal(await bootstrapAdmin(pool,{...source,ADMIN_PASSWORD:'DifferentPassword!123'}),'existing');
+  const saved=await query('SELECT password_hash FROM users WHERE email=$1',['startup-admin@example.com']);
+  assert.notEqual(saved.rows[0].password_hash, source.ADMIN_PASSWORD);
+  await query("INSERT INTO users(name,email,password_hash,role,active) VALUES($1,$2,$3,'teacher',false)",['Teacher','existing@example.com',saved.rows[0].password_hash]);
+  assert.equal(await bootstrapAdmin(pool,{...source,ADMIN_EMAIL:'existing@example.com'}),'existing');
+  const existing=await query('SELECT role,active FROM users WHERE email=$1',['existing@example.com']);
+  assert.equal(existing.rows[0].role,'teacher');assert.equal(existing.rows[0].active,false);
   const login=await request(app).post('/api/auth/login').send({email:'startup-admin@example.com',password:'StartupPassword!123'});
   assert.equal(login.status,200);
   assert.ok(login.body.accessToken);
