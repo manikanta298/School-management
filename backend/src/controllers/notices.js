@@ -1,0 +1,10 @@
+import * as service from '../services/notices.js';
+export const calendar=async(_req,res)=>res.json(await service.calendar());
+export const list=async(req,res)=>res.json({items:await service.list(req.user,req.noticeQuery,false)});
+export const manage=async(req,res)=>res.json({items:await service.list(req.user,req.noticeQuery,true)});
+export const find=async(req,res)=>res.json({item:await service.find(req.user,req.params.id)});
+export const save=async(req,res)=>res.status(req.params.id?200:201).json({item:await service.save(req.user,req.params.id,req.body)});
+export const transition=action=>async(req,res)=>res.json({item:await service.transition(req.user,req.params.id,action,req.body)});
+export const acknowledge=async(req,res)=>{await service.acknowledge(req.user,req.params.id,req.body);res.status(204).end();};
+export const readers=async(req,res)=>res.json(await service.readers(req.user,req.params.id,req.noticeQuery));
+export const audit=async(req,res)=>res.json({items:await service.audit(req.user,req.params.id,req.noticeQuery)});
