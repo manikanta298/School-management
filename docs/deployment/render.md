@@ -74,3 +74,13 @@ On the existing Render backend service set FRONTEND_ORIGIN to `https://frontend-
 The backend now automatically reads `/etc/secrets/ca.pem` if present, or reads an explicitly configured DATABASE_CA_CERT_FILE. The filename must be exactly `ca.pem`, with no quote; the path has no spaces. DATABASE_CA_CERT (inline PEM) takes precedence over file contents, so remove an obsolete inline value when switching to a file. A file read or certificate validation error stops startup. Use only the matching database provider CA bundle; mounting a file cannot fix an incorrect CA chain.
 
 Pushes to the linked production branch can trigger provider auto-deployments if enabled. After both finish, check both health links, sign in from the frontend, reload to verify refresh, and confirm logout. If direct backend health fails, resolve the database/startup error first. If only the proxy health fails, check Vercel Root Directory and deployment commit. If sign-in succeeds but refresh returns 403, check the exact FRONTEND_ORIGIN and that the proxy preserves the browser Origin header. Do not weaken origin checks to accept arbitrary sites.
+
+## Login 500 after database connectivity succeeds
+
+A health response alone previously confirmed only that the process was listening, not that schema migrations had run. Startup now runs the same transactional, advisory-locked migration runner as `npm run migrate` before opening the HTTP port. Both `npm start` and the Docker default command therefore initialize an empty database and apply pending migrations. Existing data and migration history are retained. If migration fails, the process exits before accepting login requests; check Render runtime logs for the database error code.
+
+After deployment, expect `Database migrations complete` before `API listening`. A valid login request for a nonexistent account must return 401, not 500. Refresh without a valid session also returns 401 by design.
+
+If no administrator exists yet, set ADMIN_EMAIL, ADMIN_NAME and a strong ADMIN_PASSWORD securely in Render, then run `npm run seed:admin` from the backend runtime shell. This command does not reset existing accounts. Do not commit passwords or create a public signup/admin bootstrap endpoint.
+
+If login still returns 500, check the backend log entry `Request failed: <code>` at the same time as the request. For example, 42P01 indicates a missing table; 42703 a missing column; 42501 a database permission problem. Migration-managed databases must not be replaced with unrelated legacy schemas. Share only the error code/message, never connection strings or secrets.
