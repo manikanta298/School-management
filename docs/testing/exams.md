@@ -74,7 +74,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 Production uses docker-compose.prod.yml and the existing HTTPS origin/secrets with a normal maintenance window. Without Docker: run `npm ci && npm run migrate` from backend, restart the API, then run `npm ci && npm run build` from frontend and publish the rebuilt assets. No new dependencies, secrets or environment variables are required. Do not import schema.sql over an existing database: it contains the complete fresh-schema reference through Module 7.
 
-School dates use PostgreSQL CURRENT_DATE and the database timezone configured for Attendance/Fees. /api/exams/calendar exposes the same school date. Existing enrollments/marks from legacy Laravel are not imported automatically. The migration seeds grading rules only; it creates no exams or scores.
+School dates use PostgreSQL CURRENT_DATE and the database timezone configured for Attendance/Fees. /api/exams/calendar exposes the same school date. The migration seeds grading rules only; it creates no exams or scores.
 
 ## API
 

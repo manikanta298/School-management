@@ -1,8 +1,9 @@
-### Security Vulnerabilities
-If you discover a security vulnerability within LAV_SMS, please send an e-mail to CJ Inspired via cjay.pub@gmail.com. All security vulnerabilities will be promptly addressed.
+# Security
 
-Please Note that some sections of this project are in the work-in-progress stage and would be updated soon. These include:
+This project uses React and Vite, Node.js and Express, and PostgreSQL.
 
-The Noticeboard/Calendar in the Dashboard Area
-Librarian/Acountant user pages
-Library Resources/Study Materials Upload for Students
+Report suspected vulnerabilities privately to the repository owner using a contact method they provide. Include the affected component, reproduction steps, and impact. Do not publish student records, credentials, access tokens, or unredacted database exports in public issues.
+
+Before deployment, configure HTTPS, generated environment secrets, restricted CORS origins, the correct school timezone, and database backups. Follow the setup and deployment instructions in [README.md](README.md) and the module acceptance guides in [docs/testing](docs/testing).
+
+Never commit `.env` files or real school data. Example environment files contain placeholders only.

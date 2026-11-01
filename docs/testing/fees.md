@@ -58,7 +58,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 For production use docker-compose.prod.yml, the existing HTTPS origin/secrets and a normal maintenance window. Without Docker: from backend run `npm ci && npm run migrate`, restart the API, then from frontend run `npm ci && npm run build` and publish the rebuilt assets. No new dependencies, secrets or environment variables are required. Do not import schema.sql over an existing database: that file is the complete fresh schema through Module 6.
 
-School dates use PostgreSQL CURRENT_DATE and the same database timezone configured for Attendance. The frontend reads /api/fees/calendar. Verify that displayed/current dates match the school's timezone; see the Attendance guide's ALTER DATABASE timezone example and restart pool connections after changing it. Existing balances are not seeded automatically and this module does not import legacy Laravel financial data.
+School dates use PostgreSQL CURRENT_DATE and the same database timezone configured for Attendance. The frontend reads /api/fees/calendar. Verify that displayed/current dates match the school's timezone; see the Attendance guide's ALTER DATABASE timezone example and restart pool connections after changing it. Existing balances are not seeded automatically.
 
 ## API
 

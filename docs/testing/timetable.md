@@ -70,7 +70,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 Use docker-compose.prod.yml in production with the existing HTTPS origin/secrets and a normal maintenance window. Without Docker, from backend run `npm ci && npm run migrate`, restart the API, then from frontend run `npm ci && npm run build` and publish the assets. No new dependencies, secrets or environment variables are needed. schema.sql contains the complete fresh-schema reference through Module 8; do not run it over an existing database.
 
-The school date/current Monday come from PostgreSQL CURRENT_DATE, using the database timezone configured for Attendance/Fees/Exams. Weekly date arithmetic is calendar-based; clock times are local and are not converted to browser timezones. Legacy Laravel schedules are not imported, and existing assignments do not automatically generate sessions.
+The school date/current Monday come from PostgreSQL CURRENT_DATE, using the database timezone configured for Attendance/Fees/Exams. Weekly date arithmetic is calendar-based; clock times are local and are not converted to browser timezones. Existing assignments do not automatically generate sessions.
 
 ## API
 

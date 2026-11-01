@@ -1,6 +1,6 @@
 # School Management — React, Express and PostgreSQL
 
-Modules 1–9: Auth & Users, Academic Setup, Students & Parents, Teachers, Attendance, Fees, Exams & Results, Timetable, and Notices & Dashboards. Further modules wait for testing confirmation. Existing Laravel source is preserved; its original setup is in `readme.md` and `legacy-laravel.env.example`. The new stack does not use the root Laravel package.json.
+Modules 1–9: Auth & Users, Academic Setup, Students & Parents, Teachers, Attendance, Fees, Exams & Results, Timetable, and Notices & Dashboards. The application source is separated into `/frontend` (React + Vite) and `/backend` (Node.js + Express), with PostgreSQL migrations in `/backend/database`.
 
 ## Requirements
 
@@ -19,11 +19,11 @@ Node.js 24, npm, PostgreSQL 17; or Docker Engine with Docker Compose v2.24.4+ (t
    ```
 3. Open http://localhost:5173 and sign in using the administrator credentials you chose.
 
-Seed is idempotent and never overwrites existing credentials. Migrations are transactional, serialized with an advisory lock, and recorded in schema_migrations. Do not run schema.sql on an already migrated database. Use migrations for upgrades; schema.sql is the current application-table snapshot. The legacy Laravel database is separate and is not migrated/imported.
+Seed is idempotent and never overwrites existing credentials. Migrations are transactional, serialized with an advisory lock, and recorded in schema_migrations. Do not run schema.sql on an already migrated database. Use migrations for upgrades; schema.sql is the current application-table snapshot.
 
 ## Development without Docker
 
-Create a dedicated PostgreSQL database and user (do not reuse the Laravel database). Copy backend/.env.example to backend/.env and set its values. Keep the same frontend origin. From backend run `npm ci`, `npm run migrate`, `npm run seed:admin`, then `npm run dev`. In another terminal, from frontend run `npm ci` and `npm run dev`. Vite proxies /api to localhost:4000; the browser keeps the refresh cookie on the frontend origin. Optional frontend environment settings are in frontend/.env.example; VITE variables are public and must never contain secrets.
+Create a dedicated PostgreSQL database and user. Copy backend/.env.example to backend/.env and set its values. Keep the same frontend origin. From backend run `npm ci`, `npm run migrate`, `npm run seed:admin`, then `npm run dev`. In another terminal, from frontend run `npm ci` and `npm run dev`. Vite proxies /api to localhost:4000; the browser keeps the refresh cookie on the frontend origin. Optional frontend environment settings are in frontend/.env.example; VITE variables are public and must never contain secrets.
 
 ## Production
 
@@ -82,7 +82,7 @@ Run from the repository root after reviewing `git diff` and testing:
 
 ```sh
 git switch -c feature/auth-users
-git add frontend backend docs README.md .env.example legacy-laravel.env.example .gitignore .dockerignore docker-compose.yml docker-compose.dev.yml docker-compose.prod.yml
+git add frontend backend docs README.md .env.example .gitignore .dockerignore docker-compose.yml docker-compose.dev.yml docker-compose.prod.yml
 git diff --cached --stat
 git commit -m "feat: add authentication and user management module"
 git push -u origin feature/auth-users

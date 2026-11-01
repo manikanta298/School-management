@@ -89,7 +89,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 Use docker-compose.prod.yml in production with the existing HTTPS origin/secrets and normal maintenance window. Without Docker, run `npm ci && npm run migrate` from backend, restart the API, then run `npm ci && npm run build` from frontend and publish the rebuilt assets. No new dependencies, secrets or environment variables are needed. schema.sql is the complete fresh-schema reference through Module 9; never import it over an existing database.
 
-School dates use the PostgreSQL timezone configured for earlier modules. Notice scheduling uses absolute timestamptz values and /api/notices/calendar returns server now. There is no automatic import of legacy Laravel announcements or user read state. No notices are seeded or sent to actual users by this migration.
+School dates use the PostgreSQL timezone configured for earlier modules. Notice scheduling uses absolute timestamptz values and /api/notices/calendar returns server now. No notices are seeded or sent to actual users by this migration.
 
 ## API
 

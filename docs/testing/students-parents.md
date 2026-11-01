@@ -40,7 +40,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 Production uses docker-compose.prod.yml instead of docker-compose.dev.yml; use your normal deployment maintenance window. Without Docker, run `npm ci && npm run migrate` from backend, restart the API, and run `npm ci && npm run build` from frontend. Publish the rebuilt frontend assets. Do not run schema.sql over an existing database: it is the complete fresh-schema reference through Module 3, while numbered migrations perform upgrades.
 
-Existing accounts/data remain in place. There is no automatic profile creation or conversion of legacy Laravel data. No new secrets or environment variables are required.
+Existing accounts/data remain in place. There is no automatic profile creation. No new secrets or environment variables are required.
 
 ## API
 
