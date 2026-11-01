@@ -1,0 +1,24 @@
+import { Router } from 'express';
+import { authenticate,authorize } from '../middleware/auth.js';
+import { validate } from '../validators/auth.js';
+import * as v from '../validators/attendance.js';
+import * as c from '../controllers/attendance.js';
+export const attendanceRouter=Router();
+attendanceRouter.use(authenticate,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+const staff=authorize('admin','teacher');
+const query=schema=>(req,res,next)=>{const parsed=schema.safeParse(req.query);if(!parsed.success)return res.status(400).json({message:'Invalid dates, range or pagination. Choose up to 366 inclusive days.'});req.attendanceQuery=parsed.data;next();};
+attendanceRouter.param('id',(req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid student ID'}));
+attendanceRouter.get('/calendar',c.calendar);
+attendanceRouter.get('/sections',staff,query(v.sectionsQuery),c.sections);
+attendanceRouter.get('/register',staff,query(v.registerQuery),c.register);
+attendanceRouter.put('/register',staff,validate(v.save),c.save);
+attendanceRouter.get('/summary',staff,query(v.summaryQuery),c.summary);
+attendanceRouter.get('/audit',authorize('admin'),query(v.registerQuery),c.audit);
+attendanceRouter.get('/students/:id',authorize('admin','student','parent'),query(v.studentQuery),c.history);
+attendanceRouter.use((err,_req,res,next)=>{
+ if(err.code==='23505')return res.status(409).json({message:'Student already has attendance on this date. Reload the register; void an incorrect saved mark before recording in another section.'});
+ if(err.code==='23503')return res.status(409).json({message:'Missing reference or attendance history protects this record'});
+ if(err.code==='23514')return res.status(400).json({message:'Invalid attendance date, enrollment, status or correction reason'});
+ if(['40001','40P01'].includes(err.code))return res.status(409).json({message:'Concurrent change. Reload and retry.'});
+ next(err);
+});

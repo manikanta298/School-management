@@ -1,0 +1,14 @@
+import React,{useEffect,useState} from 'react';
+import {api} from '../api/client';
+const rate=value=>value==null?'—':`${Number(value).toFixed(2)}%`;
+export default function AttendanceReport({sectionId,studentId,range}){
+ const [data,setData]=useState(null),[offset,setOffset]=useState(0),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0);
+ useEffect(()=>{let active=true;setLoading(true);setError('');const query=`from=${range.from}&to=${range.to}`;api(studentId?`/attendance/students/${studentId}?${query}&limit=25&offset=${offset}`:`/attendance/summary?section_id=${sectionId}&${query}`).then(result=>{if(active)setData(result);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[sectionId,studentId,range.from,range.to,offset,revision]);
+ return <section><h2>{studentId?'Student attendance history':'Section attendance summary'}</h2><p>Only saved marks count. Unmarked days are not absences. Attendance rate = (present + late) ÷ (present + late + absent); excused and void marks are excluded.</p>
+ {error&&<p role="alert" className="error">{error} <button onClick={()=>setRevision(v=>v+1)}>Retry</button></p>}{loading?<p role="status">Loading attendance report…</p>:error?null:!data?null:<>
+ {data.summary&&<div className="card"><p>Present: {data.summary.present} · Late: {data.summary.late} · Absent: {data.summary.absent} · Excused: {data.summary.excused} · Voided: {data.summary.voided}</p><p>Recorded days: {data.summary.recorded_days} · Attendance: {rate(data.summary.attendance_percentage)}</p></div>}
+ {!data.items.length?<p>No saved marks in this date range.</p>:<div className="table-wrap"><table><caption>{range.from} to {range.to}</caption>{studentId?<><thead><tr><th scope="col">Date</th><th scope="col">Class / section</th><th scope="col">Status</th><th scope="col">Note</th></tr></thead><tbody>{data.items.map((e,i)=><tr key={`${e.attendance_date}-${i}`}><td>{String(e.attendance_date).slice(0,10)}</td><td>{e.class_name} / {e.section_name}<br/>{e.academic_year_name}</td><td>{e.status}</td><td>{e.note||'—'}</td></tr>)}</tbody></>:<><thead><tr><th scope="col">Student</th><th scope="col">Present</th><th scope="col">Late</th><th scope="col">Absent</th><th scope="col">Excused</th><th scope="col">Voided</th><th scope="col">Recorded days</th><th scope="col">Attendance</th></tr></thead><tbody>{data.items.map(s=><tr key={s.student_id}><td>{s.name}<br/>{s.admission_number}</td><td>{s.present}</td><td>{s.late}</td><td>{s.absent}</td><td>{s.excused}</td><td>{s.voided}</td><td>{s.recorded_days}</td><td>{rate(s.attendance_percentage)}</td></tr>)}</tbody></>}</table></div>}
+ {studentId&&<><button disabled={offset===0} onClick={()=>setOffset(v=>Math.max(0,v-25))}>Previous</button> <button disabled={data.items.length<25} onClick={()=>setOffset(v=>v+25)}>Next</button><p>Page {Math.floor(offset/25)+1}</p></>}
+ </>}
+ </section>;
+}

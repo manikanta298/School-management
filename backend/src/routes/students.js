@@ -24,7 +24,7 @@ studentsRouter.delete('/:id/enrollments/:enrollmentId',admin,c.removeEnrollment)
 function errors(err,_req,res,next){
  if(err.code==='23505')return res.status(409).json({message:'Duplicate account profile, admission number, parent link, or enrollment for this year'});
  if(err.code==='23503')return res.status(409).json({message:'Wrong account role, missing reference, dependent records, or section/class/year mismatch'});
- if(err.code==='23514')return res.status(400).json({message:'Invalid dates or section capacity. Check admission, academic year dates, and available seats.'});
+ if(err.code==='23514')return res.status(400).json({message:'Invalid dates, section capacity or protected attendance history. Check admission, year dates, available seats and saved attendance.'});
  next(err);
 }
 studentsRouter.use(errors);parentsRouter.use(errors);
