@@ -121,3 +121,7 @@ Admins create date-limited weekly section sessions using subject-teacher assignm
 ## Module 9: Notices & Dashboards
 
 Admins draft, target, schedule, publish and archive in-app notices. Read acknowledgments are content-version specific, with retained history. Login now opens a role-scoped dashboard with coherent source-module counts, balances, sessions and notices. No external messages are sent. Run `npm run migrate` for 009_notices.sql. See [schema changes, API reference, audience/lifecycle rules, upgrade steps, final acceptance checklist and git commands](docs/testing/notices-dashboards.md). All nine modules are implemented; final acceptance, merge and deployment are separate steps.
+
+## Render deployment
+
+For missing environment settings during Render startup, follow [the Render setup guide](docs/deployment/render.md). The root `render.yaml` supplies a backend Blueprint; existing services require their environment values to be set in the Render dashboard.

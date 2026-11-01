@@ -1,0 +1,21 @@
+# For a new Blueprint deployment. Existing services need their Environment set manually.
+services:
+  - type: web
+    name: school-management-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: sh -c 'npm run migrate && npm start'
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: '1'
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_ORIGIN
+        sync: false
