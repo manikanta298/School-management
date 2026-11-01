@@ -1,0 +1,14 @@
+import { z } from 'zod';
+export const id=z.uuid();
+const text=max=>z.string().trim().max(max).regex(/^[^<>\x00-\x1f]*$/u);
+const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>{const d=new Date(v+'T00:00:00Z');return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v;},'Invalid date');
+const paging={limit:z.coerce.number().int().min(1).max(100).default(25),offset:z.coerce.number().int().min(0).default(0)};
+export const page=z.object(paging).strict();
+export const list=z.object({...paging,class_id:id.optional(),academic_year_id:id.optional(),student_id:id.optional(),status:z.enum(['draft','published','cancelled']).optional()}).strict();
+export const scale=z.object({name:text(100).min(1),bands:z.array(z.object({minimum_percent:z.number().int().min(0).max(100),label:z.string().trim().toUpperCase().regex(/^[A-Z0-9+-]{1,5}$/)}).strict()).min(2).max(10)}).strict().refine(v=>v.bands.some(b=>b.minimum_percent===0)&&new Set(v.bands.map(b=>b.minimum_percent)).size===v.bands.length&&new Set(v.bands.map(b=>b.label)).size===v.bands.length,{message:'Unique labels/thresholds and a zero threshold are required',path:['bands']});
+export const exam=z.object({class_id:id,term_id:id.nullable().optional().transform(v=>v??null),grading_scale_id:id,name:text(100).min(1),start_date:date,end_date:date}).strict().refine(v=>v.end_date>=v.start_date,{message:'End must follow start',path:['end_date']});
+export const paper=z.object({subject_id:id,held_on:date,max_marks:z.number().int().min(1).max(1000),pass_marks:z.number().int().min(0).max(1000)}).strict().refine(v=>v.pass_marks<=v.max_marks,{message:'Pass marks cannot exceed maximum',path:['pass_marks']});
+export const candidate=z.object({student_id:id}).strict();
+export const reason=z.object({reason:text(200).min(3)}).strict();
+export const publish=z.object({}).strict();
+export const marks=z.object({expected_version:z.number().int().min(0).max(2147483646),correction_reason:text(200).nullable().optional().transform(v=>v||null),entries:z.array(z.object({student_id:id,outcome:z.enum(['scored','absent','exempt']),score:z.number().int().min(0).max(1000).nullable(),remark:text(200).nullable().optional().transform(v=>v||null)}).strict().refine(v=>(v.outcome==='scored')===(v.score!==null)&& (v.outcome!=='exempt'||(v.remark?.length??0)>=3),{message:'Score required only for scored outcome; exemption needs a remark'})).min(1).max(100)}).strict().refine(v=>new Set(v.entries.map(e=>e.student_id)).size===v.entries.length,{message:'Duplicate student IDs',path:['entries']});
