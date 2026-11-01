@@ -15,3 +15,12 @@ _ide_helper.php
 storage
 .phpstorm.meta.php
 .editorconfig
+
+# React / Express stack
+**/node_modules/
+**/dist/
+**/coverage/
+**/.env
+**/.env.*
+!**/.env.example
+*.log

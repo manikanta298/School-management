@@ -1,0 +1,91 @@
+# School Management — React, Express and PostgreSQL
+
+Module 1: Auth & Users. Further modules wait for testing confirmation. Existing Laravel source is preserved; its original setup is in `readme.md` and `legacy-laravel.env.example`. The new stack does not use the root Laravel package.json.
+
+## Requirements
+
+Node.js 24, npm, PostgreSQL 17; or Docker Engine with Docker Compose v2.24.4+ (the dev override uses `!override`).
+
+## Development with Docker
+
+1. Copy `.env.example` to `.env`. Set a random URL-safe POSTGRES_PASSWORD, a unique ADMIN_PASSWORD (12+ characters, at most 72 UTF-8 bytes), and JWT_SECRET. Generate secrets with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`. Keep FRONTEND_ORIGIN exactly `http://localhost:5173`.
+2. Build and start the database:
+   ```sh
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml build
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm backend npm run migrate
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm backend npm run seed:admin
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+   ```
+3. Open http://localhost:5173 and sign in using the administrator credentials you chose.
+
+Seed is idempotent and never overwrites existing credentials. Migrations are transactional, serialized with an advisory lock, and recorded in schema_migrations. Do not run schema.sql on an already migrated database. Use migrations for upgrades; schema.sql is the current application-table snapshot. The legacy Laravel database is separate and is not migrated/imported.
+
+## Development without Docker
+
+Create a dedicated PostgreSQL database and user (do not reuse the Laravel database). Copy backend/.env.example to backend/.env and set its values. Keep the same frontend origin. From backend run `npm ci`, `npm run migrate`, `npm run seed:admin`, then `npm run dev`. In another terminal, from frontend run `npm ci` and `npm run dev`. Vite proxies /api to localhost:4000; the browser keeps the refresh cookie on the frontend origin. Optional frontend environment settings are in frontend/.env.example; VITE variables are public and must never contain secrets.
+
+## Production
+
+Set NODE_ENV through Compose (already production), FRONTEND_ORIGIN to your exact HTTPS URL, and generated secrets in `.env`. Configure an HTTPS reverse proxy to forward the site's traffic to `127.0.0.1:8080`; only frontend is published. Never expose backend directly: TRUST_PROXY=1 trusts the single nginx hop, and nginx overwrites X-Forwarded-For. If you change the proxy topology, review trusted proxies and rate limiting. PostgreSQL and backend ports are private in the production configuration.
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d postgres
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm backend npm run migrate
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm backend npm run seed:admin
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+Back up PostgreSQL before migrations; take regular tested backups of the school_pgdata volume/database. Do not use `down -v` unless intentionally destroying data. Use one API replica with the current in-memory rate limiter; a multi-replica deployment requires a shared limiter store. Set up TLS certificate renewal, monitoring, and database backups before real school use. Remove ADMIN_PASSWORD from deployment environment after bootstrap. Use TLS with verified certificates for a remote database (node-postgres connection-string SSL configuration). Development bind mounts and ports must never be used in production.
+
+## Security and behavior
+
+Passwords use bcrypt cost 12; length is checked in UTF-8 bytes to avoid bcrypt truncation. Email is trimmed and normalized; unknown input fields are rejected. Names reject control characters/HTML markup, and React escapes displayed text. All user values use parameterized queries. Access JWTs last 15 minutes and remain only in browser memory. Refresh tokens are random, stored as SHA-256 hashes, rotated on use, and live in HttpOnly SameSite=Strict cookies (Secure in production). Refresh/logout require the exact configured Origin to block CSRF. Refresh replay revokes all sessions for that user. Password change/reset revokes all sessions immediately; authentication checks the live database role and session on every protected request. Logout revokes the current session. Sessions expire after seven days; expired/revoked database records can be periodically purged by a DBA.
+
+There is no public registration. Admins create accounts and can reset passwords after verifying identity, then share credentials through a secure channel. Password reset currently uses the administrator workflow; email recovery is not implemented. No student, fees, attendance or exam tables/pages are implemented yet.
+
+## API
+
+All bodies are JSON. Protected routes require `Authorization: Bearer <accessToken>`. Refresh/logout need the refresh cookie and `Origin: <FRONTEND_ORIGIN>`. Errors have `{message}` and validation errors may include `errors`.
+
+| Method | Path | Access / body |
+|---|---|---|
+| GET | /api/health | Public liveness |
+| POST | /api/auth/login | Public: email, password; returns accessToken, user and refresh cookie |
+| POST | /api/auth/refresh | Refresh cookie + trusted Origin; rotates session |
+| POST | /api/auth/logout | Refresh cookie + trusted Origin; 204 |
+| GET | /api/auth/me | Any signed-in role |
+| POST | /api/auth/change-password | Any signed-in role: currentPassword, newPassword |
+| GET | /api/users?limit=25&offset=0 | Admin; limit 1–100 |
+| POST | /api/users | Admin: name, email, password, role |
+| POST | /api/users/:id/reset-password | Admin: newPassword; 204 |
+
+Roles: admin, teacher, student, parent. See `docs/testing/auth.md` for acceptance steps.
+
+## Checks
+
+```sh
+cd backend
+npm ci
+npm test
+cd ../frontend
+npm ci
+npm run build
+```
+
+The API tests execute the actual SQL schema and HTTP handlers against PGlite (embedded PostgreSQL); they do not replace Docker/PostgreSQL acceptance testing. Test credentials are test-only. Docker and browser acceptance checks need to be run in an environment with those facilities.
+
+## Commit this module
+
+Run from the repository root after reviewing `git diff` and testing:
+
+```sh
+git switch -c feature/auth-users
+git add frontend backend docs README.md .env.example legacy-laravel.env.example .gitignore .dockerignore docker-compose.yml docker-compose.dev.yml docker-compose.prod.yml
+git diff --cached --stat
+git commit -m "feat: add authentication and user management module"
+git push -u origin feature/auth-users
+```
+
+Never force-add .env or commit real credentials. Dependencies are locked separately in each app. Stop here and confirm the Auth module passes acceptance testing before starting Academic Setup.
