@@ -137,3 +137,5 @@ Verify the interface with `npm test --prefix frontend` and `npm run build --pref
 ## Demonstration data and QA
 
 Administrators can load clearly labeled fictional content from **Overview → Quick actions → Load demonstration content**. The import is transactional and repeat-safe, creates no public test passwords, and preserves existing records. See [demo dataset and validation](docs/qa/demo-content.md).
+
+The [initial QA and security assessment](docs/qa/initial-security-assessment-2026-11-02.md) records live demo verification, automated checks, fixed header gaps and remaining owner actions.
