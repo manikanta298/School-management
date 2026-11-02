@@ -127,3 +127,9 @@ Admins draft, target, schedule, publish and archive in-app notices. Read acknowl
 For missing environment settings during Render startup, follow [the Render setup guide](docs/deployment/render.md). The root `render.yaml` supplies a backend Blueprint; existing services require their environment values to be set in the Render dashboard.
 
 Production URLs: [frontend](https://frontend-javx.vercel.app) · [backend health](https://school-management-knrb.onrender.com/api/health). Vercel deployment config is in `frontend/vercel.json`; set the Vercel project Root Directory to `frontend`.
+
+## Dashboard design
+
+The frontend uses the approved white background, black text, Lucide icons, responsive sidebar and circular analytics. Dashboard charts use authorized API data only. Attendance shows recorded categories (including excused); unmarked students are never inferred as absent. Financial charts show overdue share of outstanding balances separately by currency, not a collection rate. Empty denominators display a dash. Animations respect reduced-motion preferences.
+
+Verify the interface with `npm test --prefix frontend` and `npm run build --prefix frontend`. On desktop and mobile, check sign-in, each navigation item, notices, student/teacher forms, tables, sign-out and session restore. Check all roles with their own accounts; admin-only actions remain enforced by the backend. On an empty school, expect neutral charts and academic setup guidance rather than demo numbers.

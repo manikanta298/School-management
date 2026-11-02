@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import { createRoot } from 'react-dom/client';
 import { api,restore,clearToken } from './api/client';
 import './style.css';
+import AppShell from './components/AppShell';
 import AcademicSetup from './pages/AcademicSetup';
 import StudentsParents from './pages/StudentsParents';
 import Teachers from './pages/Teachers';
@@ -23,9 +24,10 @@ function App(){
  async function reset(e,id){e.preventDefault();const form=e.currentTarget,body=Object.fromEntries(new FormData(form));await run(async()=>{await api(`/users/${id}/reset-password`,{method:'POST',body});form.reset();setNotice('Password reset. All sessions for this account were revoked.');});}
  const field=(name,label,type='text',minLength)=> <label>{label}<input name={name} type={type} required minLength={minLength} autoComplete={type==='password'?'new-password':undefined}/></label>;
  if(loading)return <main><p role="status">Loading your session…</p></main>;
- return <><header><strong>School Management</strong>{user&&<span>{user.name} · {user.role} <button onClick={logout} disabled={busy}>Sign out</button></span>}</header><main>
+ function navigate(target){setPage(target);if(target==='notices')setFocusedNotice(null);if(target==='users')run(async()=>{await loadUsers();});}
+ return <AppShell user={user} page={page} onNavigate={navigate} onLogout={logout} busy={busy}>
  {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status" className="notice">{notice}</p>}
- {!user?<section className="login"><p className="eyebrow">SCHOOL PORTAL</p><h1>Welcome back</h1><p>Sign in with your school account.</p><form onSubmit={login}>{field('email','Email','email')}<label>Password<input name="password" type="password" required autoComplete="current-password"/></label><button disabled={busy}>{busy?'Signing in…':'Sign in'}</button></form><p>Need an account or password reset? Contact your school administrator.</p></section>:<><nav><button onClick={()=>{setFocusedNotice(null);setPage('notices');}}>Notices</button><button onClick={()=>setPage('timetable')}>Timetable</button><button onClick={()=>setPage('exams')}>Exams & Results</button>{user.role!=='teacher'&&<button onClick={()=>setPage('fees')}>Fees</button>}<button onClick={()=>setPage('attendance')}>Attendance</button>{['admin','teacher'].includes(user.role)&&<button onClick={()=>setPage('teachers')}>{user.role==='admin'?'Teachers':'My teaching'}</button>}{user.role!=='teacher'&&<button onClick={()=>setPage('students')}>{user.role==='admin'?'Students & Parents':user.role==='parent'?'My family':'My profile'}</button>}<button onClick={()=>setPage('academic')}>Academic setup</button><button onClick={()=>setPage('dashboard')}>Dashboard</button><button onClick={()=>setPage('password')}>Change password</button>{user.role==='admin'&&<button onClick={()=>run(async()=>{await loadUsers();setPage('users');})}>Manage users</button>}</nav>
+ {!user?<section className="login"><p className="eyebrow">SCHOOL PORTAL</p><h1>Welcome back</h1><p>Sign in with your school account.</p><form onSubmit={login}>{field('email','Email','email')}<label>Password<input name="password" type="password" required autoComplete="current-password"/></label><button disabled={busy}>{busy?'Signing in…':'Sign in'}</button></form><p>Need an account or password reset? Contact your school administrator.</p></section>:<>
  {page==='notices'&&<Notices user={user} initialId={focusedNotice}/>}
  {page==='timetable'&&<Timetable user={user}/>}
  {page==='exams'&&<Exams user={user}/>}
@@ -37,6 +39,6 @@ function App(){
  {page==='dashboard'&&<Dashboard user={user} onNavigate={target=>{if(target==='users')run(async()=>{await loadUsers();setPage('users');});else{if(target==='notices')setFocusedNotice(null);setPage(target);}}} onOpenNotice={id=>{setFocusedNotice(id);setPage('notices');}}/>}
  {page==='password'&&<section><h1>Change password</h1><form onSubmit={change}>{field('currentPassword','Current password','password')}{field('newPassword','New password (12+ characters, maximum 72 UTF-8 bytes)','password',12)}<button disabled={busy}>Update password and sign out</button></form></section>}
  {page==='users'&&user.role==='admin'&&<section><h1>Manage users</h1><div className="grid"><div className="card"><h2>Create account</h2><form onSubmit={create}>{field('name','Full name')}{field('email','Email','email')}{field('password','Initial password (12+ characters)','password',12)}<label>Role<select name="role">{['teacher','student','parent','admin'].map(r=><option key={r}>{r}</option>)}</select></label><button disabled={busy}>Create account</button></form></div><div><h2>Accounts</h2>{users.map(u=><article className="card" key={u.id}><h3>{u.name}</h3><p>{u.email} · {u.role}</p><details><summary>Reset password</summary><form onSubmit={e=>reset(e,u.id)}>{field('newPassword','New password','password',12)}<button disabled={busy}>Reset and revoke sessions</button></form></details></article>)}<button disabled={busy||offset===0} onClick={()=>run(()=>loadUsers(Math.max(0,offset-25)))}>Previous</button> <button disabled={busy||users.length<25} onClick={()=>run(()=>loadUsers(offset+25))}>Next</button></div></div></section>}
- </> }</main></>;
+ </> }</AppShell>;
 }
 createRoot(document.getElementById('root')).render(<App/>);
