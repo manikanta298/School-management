@@ -133,3 +133,7 @@ Production URLs: [frontend](https://frontend-javx.vercel.app) · [backend health
 The frontend uses the approved white background, black text, Lucide icons, responsive sidebar and circular analytics. Dashboard charts use authorized API data only. Attendance shows recorded categories (including excused); unmarked students are never inferred as absent. Financial charts show overdue share of outstanding balances separately by currency, not a collection rate. Empty denominators display a dash. Animations respect reduced-motion preferences.
 
 Verify the interface with `npm test --prefix frontend` and `npm run build --prefix frontend`. On desktop and mobile, check sign-in, each navigation item, notices, student/teacher forms, tables, sign-out and session restore. Check all roles with their own accounts; admin-only actions remain enforced by the backend. On an empty school, expect neutral charts and academic setup guidance rather than demo numbers.
+
+## Demonstration data and QA
+
+Administrators can load clearly labeled fictional content from **Overview → Quick actions → Load demonstration content**. The import is transactional and repeat-safe, creates no public test passwords, and preserves existing records. See [demo dataset and validation](docs/qa/demo-content.md).
