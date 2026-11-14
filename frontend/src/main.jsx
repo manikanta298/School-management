@@ -7,6 +7,7 @@ import AcademicSetup from './pages/AcademicSetup';
 import StudentsParents from './pages/StudentsParents';
 import Teachers from './pages/Teachers';
 import Staff from './pages/Staff';
+import Homework from './pages/Homework';
 import Attendance from './pages/Attendance';
 import Fees from './pages/Fees';
 import Exams from './pages/Exams';
@@ -36,6 +37,7 @@ function App(){
  {page==='attendance'&&<Attendance user={user}/>}
  {page==='teachers'&&['admin','teacher'].includes(user.role)&&<Teachers user={user}/>}
  {page==='students'&&user.role!=='teacher'&&<StudentsParents user={user}/>}
+ {page==='homework'&&<Homework user={user}/>}
  {page==='staff'&&user.role==='admin'&&<Staff/>}
  {page==='academic'&&<AcademicSetup user={user}/>}
  {page==='dashboard'&&<Dashboard user={user} onNavigate={target=>{if(target==='users')run(async()=>{await loadUsers();setPage('users');});else{if(target==='notices')setFocusedNotice(null);setPage(target);}}} onOpenNotice={id=>{setFocusedNotice(id);setPage('notices');}}/>}
