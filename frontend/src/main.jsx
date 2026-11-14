@@ -9,6 +9,7 @@ import Teachers from './pages/Teachers';
 import Staff from './pages/Staff';
 import Homework from './pages/Homework';
 import Transport from './pages/Transport';
+import Calendar from './pages/Calendar';
 import Attendance from './pages/Attendance';
 import Fees from './pages/Fees';
 import Exams from './pages/Exams';
@@ -38,6 +39,7 @@ function App(){
  {page==='attendance'&&<Attendance user={user}/>}
  {page==='teachers'&&['admin','teacher'].includes(user.role)&&<Teachers user={user}/>}
  {page==='students'&&user.role!=='teacher'&&<StudentsParents user={user}/>}
+ {page==='calendar'&&<Calendar user={user}/>}
  {page==='transport'&&user.role!=='teacher'&&<Transport user={user}/>}
  {page==='homework'&&<Homework user={user}/>}
  {page==='staff'&&user.role==='admin'&&<Staff/>}

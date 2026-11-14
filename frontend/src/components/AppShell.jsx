@@ -1,5 +1,5 @@
 import React,{useState} from 'react';
-import {GraduationCap,LayoutDashboard,Users,ContactRound,Briefcase,BookOpen,ClipboardCheck,CalendarDays,Award,Bus,NotebookPen,Wallet,Megaphone,ShieldCheck,Settings2,LogOut,Menu,X,Bell,ArrowRight} from 'lucide-react';
+import {GraduationCap,LayoutDashboard,Users,ContactRound,Briefcase,BookOpen,ClipboardCheck,CalendarDays,CalendarRange,Award,Bus,NotebookPen,Wallet,Megaphone,ShieldCheck,Settings2,LogOut,Menu,X,Bell,ArrowRight} from 'lucide-react';
 export const navigationFor=role=>[
  {page:'dashboard',label:'Overview',Icon:LayoutDashboard},
  ...(role!=='teacher'?[{page:'students',label:role==='admin'?'Students & parents':role==='parent'?'My family':'My profile',Icon:Users}]:[]),
@@ -9,6 +9,7 @@ export const navigationFor=role=>[
  {page:'academic',label:'Academic setup',Icon:BookOpen},
  {page:'attendance',label:'Attendance',Icon:ClipboardCheck},
  {page:'timetable',label:'Timetable',Icon:CalendarDays},
+ {page:'calendar',label:'School calendar',Icon:CalendarRange},
  {page:'homework',label:'Homework',Icon:NotebookPen},
  {page:'exams',label:'Exams & results',Icon:Award},
  ...(role!=='teacher'?[{page:'fees',label:role==='admin'?'Fees & invoices':'My fees',Icon:Wallet}]:[]),
