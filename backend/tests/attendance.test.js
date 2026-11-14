@@ -127,3 +127,14 @@ test('register pagination, enrollment-date eligibility and joining-date limits',
  const body=mark(Array.from({length:100},(_,i)=>({student_id:`00000000-0000-4000-8000-${String(i).padStart(12,'0')}`,status:'present',note:'漢'.repeat(200)})),0,'2025-09-12');
  r=await call('put','attendance/register',body);assert.equal(r.status,400);assert.notEqual(r.status,413); // Valid bounded JSON exceeds the general API's 16KB limit.
 });
+test('half-day counts as half attendance and corrections keep audit history',async()=>{
+ let r=await call('put','attendance/register',mark([entry('s3','half_day','Left at noon')],0,'2025-10-01','c'));assert.equal(r.status,200,JSON.stringify(r.body));
+ r=await call('put','attendance/register',mark([entry('s3','present')],0,'2025-10-02','c'));assert.equal(r.status,200);
+ r=await call('put','attendance/register',mark([entry('s3','absent')],0,'2025-10-03','c'));assert.equal(r.status,200);
+ const range='from=2025-10-01&to=2025-10-31';
+ r=await call('get',`attendance/students/${ids.s3}?${range}`);assert.equal(r.status,200);assert.equal(r.body.summary.half_day,1);assert.equal(r.body.summary.recorded_days,3);assert.equal(Number(r.body.summary.attendance_percentage),50);
+ r=await call('get',`attendance/summary?section_id=${ids.c}&${range}`);assert.equal(r.body.items.find(x=>x.student_id===ids.s3).half_day,1);
+ r=await call('put','attendance/register',mark([entry('s3','present')],1,'2025-10-01','c','Arrived after all'));assert.equal(r.status,200);
+ r=await call('get',`attendance/audit?section_id=${ids.c}&date=2025-10-01`);assert.deepEqual(r.body.items.map(a=>[a.previous_status,a.new_status]),[['half_day','present'],[null,'half_day']]);
+ r=await call('put','attendance/register',mark([entry('s3','half-day')],0,'2025-10-04','c'));assert.equal(r.status,400);
+});

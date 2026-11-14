@@ -855,3 +855,115 @@ CREATE INDEX staff_members_type_status_idx ON staff_members(staff_type,employmen
 ALTER TABLE fee_payments DROP CONSTRAINT fee_payments_method_check;
 ALTER TABLE fee_payments ADD CONSTRAINT fee_payments_method_check CHECK(method IN ('cash','upi','bank_transfer','cheque','online','other'));
 ALTER TABLE fee_structures ADD COLUMN category varchar(20) NOT NULL DEFAULT 'miscellaneous' CHECK(category IN ('admission','tuition','term','examination','transport','books','uniform','activity','miscellaneous'));
+ALTER TABLE attendance_entries DROP CONSTRAINT attendance_entries_status_check;
+ALTER TABLE attendance_entries ADD CONSTRAINT attendance_entries_status_check CHECK(status IN ('present','absent','late','half_day','excused','void'));
+ALTER TABLE attendance_audit DROP CONSTRAINT attendance_audit_previous_status_check;
+ALTER TABLE attendance_audit ADD CONSTRAINT attendance_audit_previous_status_check CHECK(previous_status IS NULL OR previous_status IN ('present','absent','late','half_day','excused','void'));
+ALTER TABLE attendance_audit DROP CONSTRAINT attendance_audit_new_status_check;
+ALTER TABLE attendance_audit ADD CONSTRAINT attendance_audit_new_status_check CHECK(new_status IN ('present','absent','late','half_day','excused','void'));
+CREATE TABLE homework (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ section_id uuid NOT NULL,
+ class_id uuid NOT NULL,
+ academic_year_id uuid NOT NULL,
+ subject_id uuid NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
+ teacher_id uuid REFERENCES teachers(id) ON DELETE RESTRICT,
+ created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+ title varchar(150) NOT NULL CHECK(length(trim(title))>0),
+ details varchar(5000) NOT NULL CHECK(length(trim(details))>0),
+ assigned_on date NOT NULL,
+ due_on date NOT NULL,
+ archived_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ CHECK(due_on>=assigned_on),
+ FOREIGN KEY(section_id,class_id) REFERENCES sections(id,class_id) ON DELETE RESTRICT,
+ FOREIGN KEY(class_id,academic_year_id) REFERENCES classes(id,academic_year_id) ON DELETE RESTRICT
+);
+CREATE INDEX homework_section_due_idx ON homework(section_id,due_on);
+CREATE INDEX homework_class_year_idx ON homework(class_id,academic_year_id);
+CREATE INDEX homework_subject_idx ON homework(subject_id);
+CREATE INDEX homework_teacher_idx ON homework(teacher_id);
+CREATE INDEX homework_creator_idx ON homework(created_by);
+CREATE TABLE homework_completions (
+ homework_id uuid NOT NULL REFERENCES homework(id) ON DELETE RESTRICT,
+ student_id uuid NOT NULL REFERENCES students(id) ON DELETE RESTRICT,
+ completed_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(homework_id,student_id)
+);
+CREATE INDEX homework_completions_student_idx ON homework_completions(student_id);
+CREATE TABLE transport_vehicles (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ registration_number varchar(20) NOT NULL UNIQUE CHECK(registration_number ~ '^[A-Z0-9 -]{4,20}$'),
+ capacity integer NOT NULL CHECK(capacity BETWEEN 1 AND 200),
+ driver_name varchar(100) CHECK(driver_name IS NULL OR length(trim(driver_name))>0),
+ driver_phone varchar(30) CHECK(driver_phone IS NULL OR driver_phone ~ '^[+0-9() .-]{7,30}$'),
+ insurance_expiry date,
+ permit_expiry date,
+ active boolean NOT NULL DEFAULT true,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE transport_routes (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ name varchar(100) NOT NULL CHECK(length(trim(name))>0),
+ vehicle_id uuid REFERENCES transport_vehicles(id) ON DELETE RESTRICT,
+ active boolean NOT NULL DEFAULT true,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX transport_routes_name_unique ON transport_routes(lower(name));
+CREATE INDEX transport_routes_vehicle_idx ON transport_routes(vehicle_id);
+CREATE TABLE transport_stops (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ route_id uuid NOT NULL REFERENCES transport_routes(id) ON DELETE RESTRICT,
+ name varchar(100) NOT NULL CHECK(length(trim(name))>0),
+ sequence integer NOT NULL CHECK(sequence BETWEEN 1 AND 200),
+ UNIQUE(route_id,sequence)
+);
+CREATE TABLE transport_allocations (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ student_id uuid NOT NULL REFERENCES students(id) ON DELETE RESTRICT,
+ stop_id uuid NOT NULL REFERENCES transport_stops(id) ON DELETE RESTRICT,
+ academic_year_id uuid NOT NULL REFERENCES academic_years(id) ON DELETE RESTRICT,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(student_id,academic_year_id)
+);
+CREATE INDEX transport_allocations_stop_idx ON transport_allocations(stop_id);
+CREATE INDEX transport_allocations_year_idx ON transport_allocations(academic_year_id);
+CREATE FUNCTION validate_transport_allocation() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE vehicle uuid; seats integer; used integer;
+BEGIN
+ SELECT r.vehicle_id INTO vehicle FROM transport_stops s JOIN transport_routes r ON r.id=s.route_id WHERE s.id=NEW.stop_id;
+ IF vehicle IS NULL THEN RETURN NEW; END IF;
+ SELECT capacity INTO seats FROM transport_vehicles WHERE id=vehicle FOR UPDATE;
+ SELECT count(*) INTO used FROM transport_allocations a JOIN transport_stops s ON s.id=a.stop_id JOIN transport_routes r ON r.id=s.route_id WHERE r.vehicle_id=vehicle AND a.academic_year_id=NEW.academic_year_id AND a.id<>NEW.id;
+ IF used>=seats THEN RAISE EXCEPTION 'Vehicle capacity reached' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END; $$;
+CREATE TRIGGER transport_allocations_validate BEFORE INSERT OR UPDATE ON transport_allocations FOR EACH ROW EXECUTE FUNCTION validate_transport_allocation();
+CREATE FUNCTION check_vehicle_load(vehicle uuid) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+ IF EXISTS(SELECT 1 FROM transport_allocations a JOIN transport_stops s ON s.id=a.stop_id JOIN transport_routes r ON r.id=s.route_id WHERE r.vehicle_id=vehicle GROUP BY a.academic_year_id HAVING count(*)>(SELECT capacity FROM transport_vehicles WHERE id=vehicle)) THEN
+ RAISE EXCEPTION 'Vehicle capacity is below its allocated students' USING ERRCODE='23514'; END IF;
+END; $$;
+CREATE FUNCTION transport_vehicle_load_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN IF NEW.vehicle_id IS NOT NULL THEN PERFORM check_vehicle_load(NEW.vehicle_id); END IF; RETURN NEW; END; $$;
+CREATE TRIGGER transport_routes_load AFTER UPDATE OF vehicle_id ON transport_routes FOR EACH ROW EXECUTE FUNCTION transport_vehicle_load_guard();
+CREATE FUNCTION transport_capacity_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN PERFORM check_vehicle_load(NEW.id); RETURN NEW; END; $$;
+CREATE TRIGGER transport_vehicles_capacity AFTER UPDATE OF capacity ON transport_vehicles FOR EACH ROW EXECUTE FUNCTION transport_capacity_guard();
+CREATE TABLE school_events (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ title varchar(150) NOT NULL CHECK(length(trim(title))>0),
+ description varchar(1000),
+ event_type varchar(10) NOT NULL CHECK(event_type IN ('holiday','event','exam','meeting')),
+ starts_on date NOT NULL,
+ ends_on date NOT NULL,
+ created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ CHECK(ends_on>=starts_on)
+);
+CREATE INDEX school_events_dates_idx ON school_events(starts_on,ends_on);
+CREATE INDEX school_events_creator_idx ON school_events(created_by);

@@ -1,13 +1,16 @@
 import React,{useState} from 'react';
-import {GraduationCap,LayoutDashboard,Users,ContactRound,Briefcase,BookOpen,ClipboardCheck,CalendarDays,Award,Wallet,Megaphone,ShieldCheck,Settings2,LogOut,Menu,X,Bell,ArrowRight} from 'lucide-react';
+import {GraduationCap,LayoutDashboard,Users,ContactRound,Briefcase,BookOpen,ClipboardCheck,CalendarDays,CalendarRange,Award,Bus,NotebookPen,Wallet,Megaphone,ShieldCheck,Settings2,LogOut,Menu,X,Bell,ArrowRight} from 'lucide-react';
 export const navigationFor=role=>[
  {page:'dashboard',label:'Overview',Icon:LayoutDashboard},
  ...(role!=='teacher'?[{page:'students',label:role==='admin'?'Students & parents':role==='parent'?'My family':'My profile',Icon:Users}]:[]),
  ...(['admin','teacher'].includes(role)?[{page:'teachers',label:role==='admin'?'Teachers':'My teaching',Icon:ContactRound}]:[]),
  ...(role==='admin'?[{page:'staff',label:'Staff',Icon:Briefcase}]:[]),
+ ...(role!=='teacher'?[{page:'transport',label:'Transport',Icon:Bus}]:[]),
  {page:'academic',label:'Academic setup',Icon:BookOpen},
  {page:'attendance',label:'Attendance',Icon:ClipboardCheck},
  {page:'timetable',label:'Timetable',Icon:CalendarDays},
+ {page:'calendar',label:'School calendar',Icon:CalendarRange},
+ {page:'homework',label:'Homework',Icon:NotebookPen},
  {page:'exams',label:'Exams & results',Icon:Award},
  ...(role!=='teacher'?[{page:'fees',label:role==='admin'?'Fees & invoices':'My fees',Icon:Wallet}]:[]),
  {page:'notices',label:'Notices',Icon:Megaphone},

@@ -16,3 +16,9 @@ export function restore() {
  if(!refreshPromise) refreshPromise=api('/auth/refresh',{method:'POST'},false).finally(()=>{refreshPromise=null;});
  return refreshPromise;
 }
+export async function apiText(path,retry=true){
+ const response=await fetch(`${base}${path}`,{credentials:'include',headers:accessToken?{Authorization:`Bearer ${accessToken}`}:{}});
+ if(response.status===401&&retry){await restore();return apiText(path,false);}
+ if(!response.ok){let message='Request failed';try{message=(await response.json()).message||message;}catch{}throw new Error(message);}
+ return response.text();
+}
