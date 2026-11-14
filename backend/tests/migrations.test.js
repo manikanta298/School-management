@@ -34,7 +34,7 @@ test('startup migrates, bootstraps administrator, authenticates and safely repea
   assert.equal(refreshed.status,200);
   await query("INSERT INTO academic_years(name,start_date,end_date) VALUES($1,$2,$3)",['Persisted year','2026-01-01','2026-12-31']);
   await import('../database/migrate.js?repeat');
-  const migrations=await query('SELECT name FROM schema_migrations ORDER BY name');assert.deepEqual(migrations.rows.map(r=>r.name),['001_auth.sql','002_academic.sql','003_students_parents.sql','004_teachers.sql','005_attendance.sql','006_fees.sql','007_exams.sql','008_timetable.sql','009_notices.sql','010_student_lifecycle.sql','011_staff.sql','012_fee_categories.sql']);
+  const migrations=await query('SELECT name FROM schema_migrations ORDER BY name');assert.deepEqual(migrations.rows.map(r=>r.name),['001_auth.sql','002_academic.sql','003_students_parents.sql','004_teachers.sql','005_attendance.sql','006_fees.sql','007_exams.sql','008_timetable.sql','009_notices.sql','010_student_lifecycle.sql','011_staff.sql','012_fee_categories.sql','013_attendance_half_day.sql']);
   const data=await query('SELECT name FROM academic_years');assert.equal(data.rows[0].name,'Persisted year');
  }finally{await db.close();await originalEnd();}
 });

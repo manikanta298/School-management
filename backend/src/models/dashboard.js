@@ -2,7 +2,7 @@ import * as notices from './notices.js';
 import * as fees from './fees.js';
 import * as timetable from './timetable.js';
 export function studentScope(user,values){if(user.role==='admin')return 'true';values.push(user.id);return user.role==='student'?`s.user_id=$${values.length}`:`EXISTS(SELECT 1 FROM student_parents sp JOIN parents p ON p.id=sp.parent_id WHERE sp.student_id=s.id AND p.user_id=$${values.length})`;}
-const attendanceCounts="count(*) FILTER(WHERE ae.status='present')::int AS present,count(*) FILTER(WHERE ae.status='late')::int AS late,count(*) FILTER(WHERE ae.status='absent')::int AS absent,count(*) FILTER(WHERE ae.status='excused')::int AS excused,count(*) FILTER(WHERE ae.status<>'void')::int AS recorded";
+const attendanceCounts="count(*) FILTER(WHERE ae.status='present')::int AS present,count(*) FILTER(WHERE ae.status='late')::int AS late,count(*) FILTER(WHERE ae.status='half_day')::int AS half_day,count(*) FILTER(WHERE ae.status='absent')::int AS absent,count(*) FILTER(WHERE ae.status='excused')::int AS excused,count(*) FILTER(WHERE ae.status<>'void')::int AS recorded";
 export async function read(user,c){
  const calendar=(await c.query("SELECT CURRENT_DATE::text AS today,(CURRENT_DATE-(extract(isodow FROM CURRENT_DATE)::int-1))::text AS week_start,extract(isodow FROM CURRENT_DATE)::int AS weekday,current_setting('TimeZone') AS school_timezone,CURRENT_TIMESTAMP AS generated_at")).rows[0];
  const currentYear=(await c.query('SELECT id,name,start_date,end_date FROM academic_years WHERE is_current=true')).rows[0]||null;
