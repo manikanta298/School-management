@@ -98,3 +98,22 @@ test('input and database constraints reject malformed profiles and associations'
 });
 
 test('PostgreSQL calendar dates keep their day across server timezones',()=>{assert.equal(pg.types.getTypeParser(1082)('2025-06-01'),'2025-06-01');});
+test('profile fields, lifecycle status changes close enrollments and keep history',async()=>{
+ const {user_id,...profile}=studentBody('s1');
+ let r=await call('put',`students/${ids.s1}`,{...profile,gender:'female',blood_group:'O+',nationality:'Indian',city:'Hyderabad',state:'Telangana',pin_code:'500001',previous_school:'Old School'});assert.equal(r.status,200);
+ assert.equal(r.body.item.gender,'female');assert.equal(r.body.item.blood_group,'O+');assert.equal(r.body.item.pin_code,'500001');assert.equal(r.body.item.lifecycle_status,'active');
+ for(const bad of [{pin_code:'12AB'},{gender:'x'},{blood_group:'Z+'},{city:'<b>'}]){r=await call('put',`students/${ids.s1}`,{...profile,...bad});assert.equal(r.status,400);}
+ r=await call('post',`students/${ids.s1}/status`,{status:'transferred'});assert.equal(r.status,400);
+ r=await call('post',`students/${ids.s1}/status`,{status:'retired',reason:'Not allowed'});assert.equal(r.status,400);
+ for(const who of ['s1','p1','teacher']){r=await call('post',`students/${ids.s1}/status`,{status:'inactive',reason:'Not permitted'},who);assert.equal(r.status,403);}
+ r=await call('post',`students/${ids.s1}/status`,{status:'transferred',reason:'Moved to another school'});assert.equal(r.status,200);
+ assert.equal(r.body.item.lifecycle_status,'transferred');assert.equal(r.body.item.closed_enrollments,1);
+ r=await call('get',`students/${ids.s1}/enrollments`);assert.equal(r.body.items[0].status,'withdrawn');
+ r=await call('get','students?status=transferred');assert.equal(r.body.items.length,1);r=await call('get','students?status=active');assert.equal(r.body.items.some(s=>s.id===ids.s1),false);
+ r=await call('delete',`students/${ids.s1}`);assert.equal(r.status,409);
+ r=await call('post',`students/${ids.s1}/status`,{status:'active',reason:'Returned to the school'});assert.equal(r.status,200);assert.equal(r.body.item.closed_enrollments,0);
+ r=await call('get',`students/${ids.s1}/status-history`);assert.deepEqual(r.body.items.map(h=>[h.previous_status,h.new_status]),[['transferred','active'],['active','transferred']]);
+ r=await call('get',`students/${ids.s1}/status-history`,undefined,'s1');assert.equal(r.status,403);
+ await assert.rejects(query('DELETE FROM student_status_history'),/append-only/);
+ r=await call('post',`students/00000000-0000-4000-8000-000000000999/status`,{status:'inactive',reason:'Unknown student'});assert.equal(r.status,404);
+});

@@ -13,3 +13,5 @@ export async function removeLink(studentId,parentId){if(!await model.removeLink(
 export async function enrollments(user,studentId,query){await find('students',user,studentId);return model.enrollments(studentId,query);}
 export async function saveEnrollment(user,studentId,id,data){await find('students',user,studentId);const result=await model.saveEnrollment(studentId,id,data);if(!result)throw fail(404,'Enrollment or section not found');return result;}
 export async function removeEnrollment(studentId,id){if(!await model.removeEnrollment(studentId,id))throw fail(404,'Enrollment not found');}
+export async function setStatus(user,studentId,data){const result=await model.setStatus(studentId,user.id,data);if(!result)throw fail(404,'Record not found');const item=await find('students',user,studentId);return {...item,closed_enrollments:result.closed_enrollments};}
+export async function statusHistory(studentId,query){return model.statusHistory(studentId,query);}
