@@ -1,0 +1,13 @@
+import { z } from 'zod';
+export const id=z.uuid();
+const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>{const d=new Date(v+'T00:00:00Z');return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v;},'Invalid calendar date');
+const name=z.string().trim().min(1).max(100).regex(/^[^<>\x00-\x1f]*$/u);
+const optionalDate=date.nullable().optional().transform(v=>v??null);
+export const vehicle=z.object({registration_number:z.string().trim().toUpperCase().regex(/^[A-Z0-9 -]{4,20}$/),capacity:z.number().int().min(1).max(200),driver_name:name.nullable().optional().transform(v=>v??null),driver_phone:z.string().trim().regex(/^[+0-9() .-]{7,30}$/).nullable().optional().transform(v=>v??null),insurance_expiry:optionalDate,permit_expiry:optionalDate,active:z.boolean().default(true)}).strict();
+export const route=z.object({name,vehicle_id:id.nullable().optional().transform(v=>v??null),active:z.boolean().default(true)}).strict();
+export const stop=z.object({name,sequence:z.number().int().min(1).max(200)}).strict();
+export const allocation=z.object({student_id:id,stop_id:id,academic_year_id:id}).strict();
+export const reallocation=z.object({stop_id:id}).strict();
+const paging={limit:z.coerce.number().int().min(1).max(100).default(25),offset:z.coerce.number().int().min(0).default(0)};
+export const page=z.object(paging).strict();
+export const allocationQuery=z.object({...paging,route_id:id.optional(),academic_year_id:id.optional()}).strict();

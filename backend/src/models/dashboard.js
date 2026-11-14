@@ -2,7 +2,7 @@ import * as notices from './notices.js';
 import * as fees from './fees.js';
 import * as timetable from './timetable.js';
 export function studentScope(user,values){if(user.role==='admin')return 'true';values.push(user.id);return user.role==='student'?`s.user_id=$${values.length}`:`EXISTS(SELECT 1 FROM student_parents sp JOIN parents p ON p.id=sp.parent_id WHERE sp.student_id=s.id AND p.user_id=$${values.length})`;}
-const attendanceCounts="count(*) FILTER(WHERE ae.status='present')::int AS present,count(*) FILTER(WHERE ae.status='late')::int AS late,count(*) FILTER(WHERE ae.status='absent')::int AS absent,count(*) FILTER(WHERE ae.status='excused')::int AS excused,count(*) FILTER(WHERE ae.status<>'void')::int AS recorded";
+const attendanceCounts="count(*) FILTER(WHERE ae.status='present')::int AS present,count(*) FILTER(WHERE ae.status='late')::int AS late,count(*) FILTER(WHERE ae.status='half_day')::int AS half_day,count(*) FILTER(WHERE ae.status='absent')::int AS absent,count(*) FILTER(WHERE ae.status='excused')::int AS excused,count(*) FILTER(WHERE ae.status<>'void')::int AS recorded";
 async function adminInsights(yearId,c){
  const classStrength=(await c.query("SELECT cl.id,cl.name,count(en.id)::int AS students FROM classes cl LEFT JOIN enrollments en ON en.class_id=cl.id AND en.status='active' WHERE cl.academic_year_id=$1 GROUP BY cl.id,cl.name ORDER BY cl.name",[yearId])).rows;
  const collection=(await c.query("SELECT to_char(date_trunc('month',p.paid_on),'YYYY-MM') AS month,i.currency,sum(p.amount_minor)::text AS collected_minor FROM fee_payments p JOIN fee_invoices i ON i.id=p.invoice_id WHERE p.reversed_at IS NULL AND p.paid_on>=date_trunc('month',CURRENT_DATE)-interval '5 months' GROUP BY 1,2 ORDER BY 1,2")).rows;

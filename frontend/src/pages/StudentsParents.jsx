@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {api} from '../api/client';
 import {allPages} from '../api/pagination';
 import StudentDetails from './StudentDetails';
+import StudentExchange from './StudentExchange';
 const dateOnly=value=>String(value??'').slice(0,10);
 const emptyOptions={accounts:[],parents:[],years:[],classes:[],sections:[]};
 async function accountOptions(){
@@ -41,6 +42,7 @@ export default function StudentsParents({user}){
  </article>)}<button disabled={busy||offset===0} onClick={()=>{setSelected(null);setOffset(v=>Math.max(0,v-25));}}>Previous</button> <button disabled={busy||items.length<25} onClick={()=>{setSelected(null);setOffset(v=>v+25);}}>Next</button><p>Page {Math.floor(offset/25)+1}</p></div>
  </div>}
  {removing&&<div className="card" role="alert"><p>Delete profile for {removing.name}? Linked parents and enrollment records must be removed first. The login account is retained.</p><button disabled={busy} onClick={remove}>Confirm delete</button> <button disabled={busy} onClick={()=>setRemoving(null)}>Cancel</button></div>}
+ {user.role==='admin'&&<StudentExchange/>}
  {selected&&<StudentDetails key={selected.id} student={selected} user={user} options={options} onClose={()=>setSelected(null)}/>}
  </section>;
 }

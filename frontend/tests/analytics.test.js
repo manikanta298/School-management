@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {attendanceAnalysis,publicationAnalysis,overdueAnalysis} from '../src/components/analytics.js';
 test('attendance uses only recorded categories, including excused, and does not invent absences',()=>{
  const result=attendanceAnalysis({present:80,late:5,absent:10,excused:5,recorded:100});
- assert.equal(result.total,100);assert.equal(result.percent,85);assert.equal(result.segments.length,4);
+ assert.equal(result.total,100);assert.equal(result.percent,85);assert.equal(result.segments.length,5);
  assert.equal(attendanceAnalysis({present:0,late:0,absent:0,excused:0,recorded:0}).percent,null);
 });
 test('publication percentage has a meaningful denominator and handles an empty school',()=>{
@@ -15,4 +15,8 @@ test('overdue share preserves large minor-unit amounts and never divides by zero
  assert.equal(overdueAnalysis({outstanding_minor:'300',overdue_minor:'100'}),33.33);
  assert.equal(overdueAnalysis({outstanding_minor:'100',overdue_minor:'0'}),0);
  assert.equal(overdueAnalysis({outstanding_minor:'0',overdue_minor:'0'}),null);
+});
+test('half days count as half attendance and appear as their own segment',()=>{
+ const result=attendanceAnalysis({present:6,late:2,absent:1,excused:0,half_day:2});
+ assert.equal(result.total,11);assert.equal(result.segments.find(s=>s.key==='half_day').value,2);assert.equal(Math.round(result.percent*100)/100,81.82);
 });
