@@ -3,9 +3,10 @@ export const id=z.uuid();
 const text=max=>z.string().trim().max(max).regex(/^[^<>\x00-\x1f]*$/u);
 const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>{const d=new Date(v+'T00:00:00Z');return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v;},'Invalid calendar date');
 const amount=z.number().int().min(1).max(1000000000);
-export const structure=z.object({class_id:id,name:text(100).min(1),amount_minor:amount,currency:z.enum(['INR','USD','EUR','GBP']).default('INR'),active:z.boolean().default(true)}).strict();
+const categories=['admission','tuition','term','examination','transport','books','uniform','activity','miscellaneous'];
+export const structure=z.object({class_id:id,name:text(100).min(1),category:z.enum(categories).default('miscellaneous'),amount_minor:amount,currency:z.enum(['INR','USD','EUR','GBP']).default('INR'),active:z.boolean().default(true)}).strict();
 export const invoice=z.object({student_id:id,fee_structure_id:id,issued_on:date,due_on:date}).strict().refine(v=>v.due_on>=v.issued_on,{message:'Due date cannot precede issue date',path:['due_on']});
-export const payment=z.object({amount_minor:amount,paid_on:date,method:z.enum(['cash','bank_transfer','cheque','other']),reference:text(80).nullable().optional().transform(v=>v||null),idempotency_key:id}).strict();
+export const payment=z.object({amount_minor:amount,paid_on:date,method:z.enum(['cash','upi','bank_transfer','cheque','online','other']),reference:text(80).nullable().optional().transform(v=>v||null),idempotency_key:id}).strict();
 export const reason=z.object({reason:text(200).min(3)}).strict();
 const paging={limit:z.coerce.number().int().min(1).max(100).default(25),offset:z.coerce.number().int().min(0).default(0)};
 const filters={student_id:id.optional(),academic_year_id:id.optional()};
@@ -13,3 +14,5 @@ export const listQuery=z.object({...paging,...filters,status:z.enum(['unpaid','p
 export const summaryQuery=z.object(filters).strict();
 export const structureQuery=z.object({...paging,class_id:id.optional(),academic_year_id:id.optional()}).strict();
 export const page=z.object(paging).strict();
+export const collectionQuery=z.object({from:date.optional(),to:date.optional(),group_by:z.enum(['day','month','method','class','category']).default('month')}).strict().refine(v=>!v.from||!v.to||(v.from<=v.to&&(new Date(v.to)-new Date(v.from))/86400000<=366),{message:'Range must be ordered and at most 366 days',path:['to']});
+export const defaulterQuery=z.object(paging).strict();
