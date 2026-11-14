@@ -21,6 +21,8 @@ studentsRouter.get('/:id/enrollments',page,c.enrollments);
 studentsRouter.post('/:id/enrollments',admin,validate(v.enrollment),c.saveEnrollment);
 studentsRouter.put('/:id/enrollments/:enrollmentId',admin,validate(v.enrollment),c.saveEnrollment);
 studentsRouter.delete('/:id/enrollments/:enrollmentId',admin,c.removeEnrollment);
+studentsRouter.post('/:id/status',admin,validate(v.statusChange),c.setStatus);
+studentsRouter.get('/:id/status-history',admin,page,c.statusHistory);
 function errors(err,_req,res,next){
  if(err.code==='23505')return res.status(409).json({message:'Duplicate account profile, admission number, parent link, or enrollment for this year'});
  if(err.code==='23503')return res.status(409).json({message:'Wrong account role, missing reference, dependent records, or section/class/year mismatch'});

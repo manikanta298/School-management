@@ -9,3 +9,5 @@ export const removeLink=async(req,res)=>{await service.removeLink(req.params.id,
 export const enrollments=async(req,res)=>res.json({items:await service.enrollments(req.user,req.params.id,req.directoryQuery)});
 export const saveEnrollment=async(req,res)=>res.status(req.params.enrollmentId?200:201).json({item:await service.saveEnrollment(req.user,req.params.id,req.params.enrollmentId,req.body)});
 export const removeEnrollment=async(req,res)=>{await service.removeEnrollment(req.params.id,req.params.enrollmentId);res.status(204).end();};
+export const setStatus=async(req,res)=>res.json({item:await service.setStatus(req.user,req.params.id,req.body)});
+export const statusHistory=async(req,res)=>res.json({items:await service.statusHistory(req.params.id,req.directoryQuery)});
