@@ -9,16 +9,18 @@ await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const hash=await hashPassword('TransportPassword!123'),accounts={},tokens={},ids={};
+const schoolId=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
 const insert=async(sql,params)=>(await query(sql,params)).rows[0].id;
 for(const [key,role] of [['admin','admin'],['teacher','teacher'],['s1','student'],['s2','student'],['s3','student'],['parent','parent'],['outsider','parent']]){
  accounts[key]=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key}@example.com`,hash,role]);
+ await query('INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,\'active\',true)',[schoolId,accounts[key],role]);
  const login=await request(app).post('/api/auth/login').send({email:`${key}@example.com`,password:'TransportPassword!123'});assert.equal(login.status,200);tokens[key]=login.body.accessToken;
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
 const day=offset=>{const d=new Date();d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);};
-ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current) VALUES('Current',CURRENT_DATE-60,CURRENT_DATE+300,true) RETURNING id");
-for(const key of ['s1','s2','s3'])ids[key]=await insert('INSERT INTO students(user_id,admission_number,admission_date) VALUES($1,$2,CURRENT_DATE-90) RETURNING id',[accounts[key],key.toUpperCase()]);
-ids.parent=await insert('INSERT INTO parents(user_id) VALUES($1) RETURNING id',[accounts.parent]);await insert('INSERT INTO parents(user_id) VALUES($1) RETURNING id',[accounts.outsider]);
+ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current,school_id) VALUES('Current',CURRENT_DATE-60,CURRENT_DATE+300,true,$1) RETURNING id",[schoolId]);
+for(const key of ['s1','s2','s3'])ids[key]=await insert('INSERT INTO students(user_id,admission_number,admission_date,school_id) VALUES($1,$2,CURRENT_DATE-90,$3) RETURNING id',[accounts[key],key.toUpperCase(),schoolId]);
+ids.parent=await insert('INSERT INTO parents(user_id,school_id) VALUES($1,$2) RETURNING id',[accounts.parent,schoolId]);await insert('INSERT INTO parents(user_id,school_id) VALUES($1,$2) RETURNING id',[accounts.outsider,schoolId]);
 await query("INSERT INTO student_parents(student_id,parent_id,relationship) VALUES($1,$2,'guardian')",[ids.s1,ids.parent]);
 after(async()=>{await db.close();await pool.end();});
 const vehicle=(extra={})=>({registration_number:'ts 09 ab 1234',capacity:2,driver_name:'Ravi',driver_phone:'+91 98765 43210',insurance_expiry:day(100),permit_expiry:day(100),...extra});
@@ -72,4 +74,24 @@ test('allocations are scoped, unique per year and limited by vehicle capacity',a
  r=await call('post','transport/allocations',body('s2',southStop.body.item.stops[0].id));assert.equal(r.status,201);
  r=await call('put',`transport/routes/${south.body.item.id}`,{name:'South',vehicle_id:ids.bus,active:true});assert.equal(r.status,400);
  r=await call('get','transport/allocations');assert.equal(r.body.items.find(a=>a.student_id===ids.s2).vehicle_registration,null);
+});
+
+test('transport records and relationships are isolated by active school',async()=>{
+ const schoolB=await insert("INSERT INTO schools(name,slug) VALUES('Second School','second-school') RETURNING id");
+ const userB=await insert("INSERT INTO users(name,email,password_hash,role) VALUES('Second Admin','second-admin@example.com',$1,'admin') RETURNING id",[hash]);
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'admin','active',true)",[schoolB,userB]);
+ const login=await request(app).post('/api/auth/login').send({email:'second-admin@example.com',password:'TransportPassword!123'});
+ assert.equal(login.status,200);const tokenB=login.body.accessToken;
+ const callB=(method,path,body)=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokenB}`);return body?req.send(body):req;};
+ let r=await callB('get','transport/vehicles');assert.equal(r.status,200);assert.equal(r.body.items.length,0);
+ r=await callB('post','transport/vehicles',vehicle());assert.equal(r.status,201);const busB=r.body.item.id;
+ r=await callB('get','transport/vehicles');assert.equal(r.body.items.length,1);
+ r=await callB('get','transport/routes');assert.equal(r.body.items.length,0);
+ r=await callB('post','transport/routes',{name:'North',vehicle_id:ids.bus});assert.equal(r.status,409,'cross-school vehicle reference must be rejected');
+ r=await callB('post','transport/routes',{name:'North',vehicle_id:busB});assert.equal(r.status,201);const routeB=r.body.item.id;
+ r=await callB('post',`transport/routes/${routeB}/stops`,{name:'Market',sequence:1});assert.equal(r.status,201);const stopB=r.body.item.stops[0].id;
+ r=await callB('post','transport/allocations',{student_id:ids.s1,stop_id:stopB,academic_year_id:ids.year});assert.equal(r.status,409,'cross-school student and academic year references must be rejected');
+ r=await callB('put',`transport/vehicles/${ids.bus}`,vehicle({driver_name:'Hijack'}));assert.equal(r.status,404,'school B cannot update school A vehicle');
+ const schoolA=await call('get','transport/vehicles');assert.equal(schoolA.body.items.length,3,'school A must not see school B vehicle');
+ const routesA=await call('get','transport/routes');assert.equal(routesA.body.items.length,2,'school A must not see school B route');
 });
