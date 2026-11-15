@@ -11,7 +11,7 @@ export const matches = (p,h)=>bcrypt.compare(p,h);
 export const dummyHash = await hashPassword(randomBytes(32).toString('hex'));
 export async function issue(user,client=pool,requestedSchoolId=null) {
  const {rows:[membership]}=await client.query(
-  "SELECT school_id,role FROM school_memberships WHERE user_id=$1 AND status='active' AND ($2::uuid IS NULL OR school_id=$2) ORDER BY is_default DESC,created_at ASC LIMIT 1",
+  "SELECT m.school_id,m.role FROM school_memberships m JOIN schools s ON s.id=m.school_id AND s.status='active' WHERE m.user_id=$1 AND m.status='active' AND ($2::uuid IS NULL OR m.school_id=$2) ORDER BY m.is_default DESC,m.created_at ASC LIMIT 1",
   [user.id,requestedSchoolId]
  );
  if(!membership) throw fail(403,'No active school membership');
