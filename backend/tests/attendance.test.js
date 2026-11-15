@@ -20,6 +20,7 @@ ids.year=await insert('INSERT INTO academic_years(school_id,name,start_date,end_
 for(const key of ['c1','c2'])ids[key]=await insert('INSERT INTO classes(school_id,name,academic_year_id) VALUES($1,$2,$3) RETURNING id',[schoolA,key,ids.year]);
 for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('INSERT INTO sections(school_id,name,class_id,capacity) VALUES($1,$2,$3,40) RETURNING id',[schoolA,key,ids[cl]]);
 ids.subject=await insert("INSERT INTO subjects(school_id,name,code) VALUES($1,'Math','MATH') RETURNING id",[schoolA]);
+for(const [key,kind,cl] of [['classTeacher','class_teacher','c1'],['subjectTeacher','subject_teacher','c1'],['otherTeacher','class_teacher','c2']]){
  ids[key]=await insert('INSERT INTO teachers(school_id,user_id,employee_number,joining_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolA,accounts[key],key.toUpperCase(),'2020-01-01']);
  ids[key+'assignment']=await insert('INSERT INTO teacher_assignments(school_id,teacher_id,class_id,academic_year_id,kind,subject_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[schoolA,ids[key],ids[cl],ids.year,kind,kind==='subject_teacher'?ids.subject:null]);
 }
