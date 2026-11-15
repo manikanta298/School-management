@@ -9,26 +9,27 @@ await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const hash=await hashPassword('AttendancePassword!123'),accounts={},tokens={},ids={};
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
 for(const [key,role] of [['admin','admin'],['classTeacher','teacher'],['subjectTeacher','teacher'],['otherTeacher','teacher'],['s1','student'],['s2','student'],['s3','student'],['parent','parent'],['outsider','parent']]){
- const {rows:[u]}=await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key.toLowerCase()}@example.com`,hash,role]);accounts[key]=u.id;
+ const {rows:[u]}=await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key.toLowerCase()}@example.com`,hash,role]);accounts[key]=u.id;await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolA,u.id,role]);
  const logged=await request(app).post('/api/auth/login').send({email:`${key.toLowerCase()}@example.com`,password:'AttendancePassword!123'});assert.equal(logged.status,200);tokens[key]=logged.body.accessToken;
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
 const insert=async(sql,params)=>(await query(sql,params)).rows[0].id;
-ids.year=await insert('INSERT INTO academic_years(name,start_date,end_date) VALUES($1,$2,$3) RETURNING id',['2025–2026','2025-06-01','2026-05-31']);
-for(const key of ['c1','c2'])ids[key]=await insert('INSERT INTO classes(name,academic_year_id) VALUES($1,$2) RETURNING id',[key,ids.year]);
-for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('INSERT INTO sections(name,class_id,capacity) VALUES($1,$2,40) RETURNING id',[key,ids[cl]]);
-ids.subject=await insert("INSERT INTO subjects(name,code) VALUES('Math','MATH') RETURNING id");
+ids.year=await insert('INSERT INTO academic_years(school_id,name,start_date,end_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolA,'2025–2026','2025-06-01','2026-05-31']);
+for(const key of ['c1','c2'])ids[key]=await insert('INSERT INTO classes(school_id,name,academic_year_id) VALUES($1,$2,$3) RETURNING id',[schoolA,key,ids.year]);
+for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('INSERT INTO sections(school_id,name,class_id,capacity) VALUES($1,$2,$3,40) RETURNING id',[schoolA,key,ids[cl]]);
+ids.subject=await insert("INSERT INTO subjects(school_id,name,code) VALUES($1,'Math','MATH') RETURNING id",[schoolA]);
 for(const [key,kind,cl] of [['classTeacher','class_teacher','c1'],['subjectTeacher','subject_teacher','c1'],['otherTeacher','class_teacher','c2']]){
- ids[key]=await insert('INSERT INTO teachers(user_id,employee_number,joining_date) VALUES($1,$2,$3) RETURNING id',[accounts[key],key.toUpperCase(),'2020-01-01']);
- ids[key+'assignment']=await insert('INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind,subject_id) VALUES($1,$2,$3,$4,$5) RETURNING id',[ids[key],ids[cl],ids.year,kind,kind==='subject_teacher'?ids.subject:null]);
+ ids[key]=await insert('INSERT INTO teachers(school_id,user_id,employee_number,joining_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolA,accounts[key],key.toUpperCase(),'2020-01-01']);
+ ids[key+'assignment']=await insert('INSERT INTO teacher_assignments(school_id,teacher_id,class_id,academic_year_id,kind,subject_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[schoolA,ids[key],ids[cl],ids.year,kind,kind==='subject_teacher'?ids.subject:null]);
 }
 for(const [key,sec,cl] of [['s1','a','c1'],['s2','a','c1'],['s3','c','c2']]){
- ids[key]=await insert('INSERT INTO students(user_id,admission_number,admission_date) VALUES($1,$2,$3) RETURNING id',[accounts[key],key.toUpperCase(),'2025-01-01']);
- ids[key+'enrollment']=await insert('INSERT INTO enrollments(student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,$5) RETURNING id',[ids[key],ids.year,ids[cl],ids[sec],'2025-06-01']);
+ ids[key]=await insert('INSERT INTO students(school_id,user_id,admission_number,admission_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolA,accounts[key],key.toUpperCase(),'2025-01-01']);
+ ids[key+'enrollment']=await insert('INSERT INTO enrollments(school_id,student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[schoolA,ids[key],ids.year,ids[cl],ids[sec],'2025-06-01']);
 }
-ids.parent=await insert('INSERT INTO parents(user_id) VALUES($1) RETURNING id',[accounts.parent]);
-await query("INSERT INTO student_parents(student_id,parent_id,relationship) VALUES($1,$2,'guardian')",[ids.s1,ids.parent]);
+ids.parent=await insert('INSERT INTO parents(school_id,user_id) VALUES($1,$2) RETURNING id',[schoolA,accounts.parent]);
+await query("INSERT INTO student_parents(school_id,student_id,parent_id,relationship) VALUES($1,$2,$3,'guardian')",[schoolA,ids.s1,ids.parent]);
 const daily=(sec='a',date='2025-09-01')=>`attendance/register?section_id=${ids[sec]}&date=${date}`;
 const mark=(entries,expected_version=0,date='2025-09-01',sec='a',correction_reason=null)=>({section_id:ids[sec],date,expected_version,entries,correction_reason});
 const entry=(key,status,note=null)=>({student_id:ids[key],status,note});
@@ -111,15 +112,15 @@ test('assignment removal and inactivity revoke attendance access immediately',as
 test('register pagination, enrollment-date eligibility and joining-date limits',async()=>{
  for(let index=0;index<26;index++){
   const uid=await insert("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'student') RETURNING id",[`Extra ${index}`,`extra${index}@example.com`,hash]);
-  const sid=await insert('INSERT INTO students(user_id,admission_number,admission_date) VALUES($1,$2,$3) RETURNING id',[uid,`EXTRA-${index}`,'2025-01-01']);
-  await query('INSERT INTO enrollments(student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,$5)',[sid,ids.year,ids.c1,ids.a,'2025-09-10']);if(index===0)ids.extra=sid;
+  const sid=await insert('INSERT INTO students(school_id,user_id,admission_number,admission_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolA,uid,`EXTRA-${index}`,'2025-01-01']);
+  await query('INSERT INTO enrollments(school_id,student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,$5,$6)',[schoolA,sid,ids.year,ids.c1,ids.a,'2025-09-10']);if(index===0)ids.extra=sid;
  }
  let r=await call('get',daily('a','2025-09-09'));assert.equal(r.body.items.length,1);
  r=await call('get',daily('a','2025-09-10'));assert.equal(r.body.items.length,25);
  r=await call('get',daily('a','2025-09-10')+'&offset=25');assert.equal(r.body.items.length,2);
  r=await call('put','attendance/register',mark([{student_id:ids.extra,status:'present'}],0,'2025-09-09'));assert.equal(r.status,400);
  await query('UPDATE teachers SET joining_date=$1 WHERE id=$2',['2025-09-11',ids.classTeacher]);
- await query("INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind) VALUES($1,$2,$3,'class_teacher')",[ids.classTeacher,ids.c1,ids.year]);
+ await query("INSERT INTO teacher_assignments(school_id,teacher_id,class_id,academic_year_id,kind) VALUES($1,$2,$3,$4,'class_teacher')",[schoolA,ids.classTeacher,ids.c1,ids.year]);
  r=await call('put','attendance/register',mark([{student_id:ids.extra,status:'present'}],0,'2025-09-10'),'classTeacher');assert.equal(r.status,400);
  r=await call('put','attendance/register',mark([{student_id:ids.extra,status:'present'}],0,'2025-09-10'));assert.equal(r.status,200);
  await assert.rejects(query('UPDATE attendance_entries SET student_id=$1 WHERE student_id=$2',[ids.s3,ids.extra]),e=>e.code==='23514');
@@ -137,4 +138,26 @@ test('half-day counts as half attendance and corrections keep audit history',asy
  r=await call('put','attendance/register',mark([entry('s3','present')],1,'2025-10-01','c','Arrived after all'));assert.equal(r.status,200);
  r=await call('get',`attendance/audit?section_id=${ids.c}&date=2025-10-01`);assert.deepEqual(r.body.items.map(a=>[a.previous_status,a.new_status]),[['half_day','present'],[null,'half_day']]);
  r=await call('put','attendance/register',mark([entry('s3','half-day')],0,'2025-10-04','c'));assert.equal(r.status,400);
+});
+
+test('attendance registers and records are isolated across schools',async()=>{
+ const schoolB=(await query("INSERT INTO schools(name,slug) VALUES('Attendance Second School','attendance-second-school') RETURNING id")).rows[0].id;
+ const makeUser=async(name,role)=>{const email=name+'@example.com';const id=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[name,email,hash,role]);await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolB,id,role]);return {id,email};};
+ const adminB=await makeUser('attendance-admin-b','admin'),studentB=await makeUser('attendance-student-b','student');
+ const login=await request(app).post('/api/auth/login').send({email:adminB.email,password:'AttendancePassword!123'});assert.equal(login.status,200);
+ const callB=(method,path,body)=>{const req=request(app)[method]('/api/'+path).set('Authorization','Bearer '+login.body.accessToken);return body?req.send(body):req;};
+ let r=await callB('get','attendance/sections');assert.equal(r.status,200);assert.deepEqual(r.body.items,[]);
+ r=await callB('get',daily());assert.equal(r.status,404);
+ r=await callB('put','attendance/register',mark([entry('s1','present')]));assert.equal(r.status,404);
+ const yearB=await insert('INSERT INTO academic_years(school_id,name,start_date,end_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolB,'B 2025–2026','2025-06-01','2026-05-31']);
+ const classB=await insert('INSERT INTO classes(school_id,name,academic_year_id) VALUES($1,$2,$3) RETURNING id',[schoolB,'B Class',yearB]);
+ const sectionB=await insert('INSERT INTO sections(school_id,name,class_id,capacity) VALUES($1,$2,$3,40) RETURNING id',[schoolB,'B Section',classB]);
+ const studentIdB=await insert('INSERT INTO students(school_id,user_id,admission_number,admission_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolB,studentB.id,'B-ADM-1','2025-01-01']);
+ await query('INSERT INTO enrollments(school_id,student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,$5,$6)',[schoolB,studentIdB,yearB,classB,sectionB,'2025-06-01']);
+ const schoolABefore=(await query('SELECT count(*)::int AS count FROM attendance_entries WHERE school_id=$1',[schoolA])).rows[0].count;
+ const payload={section_id:sectionB,date:'2025-09-01',expected_version:0,entries:[{student_id:studentIdB,status:'present'}]};
+ r=await callB('put','attendance/register',payload);assert.equal(r.status,200,JSON.stringify(r.body));
+ r=await callB('get',`attendance/register?section_id=${sectionB}&date=2025-09-01`);assert.equal(r.status,200);assert.equal(r.body.items.length,1);assert.equal(r.body.items[0].student_id,studentIdB);
+ assert.equal((await query('SELECT count(*)::int AS count FROM attendance_entries WHERE school_id=$1',[schoolB])).rows[0].count,1);
+ assert.equal((await query('SELECT count(*)::int AS count FROM attendance_entries WHERE school_id=$1',[schoolA])).rows[0].count,schoolABefore);
 });
