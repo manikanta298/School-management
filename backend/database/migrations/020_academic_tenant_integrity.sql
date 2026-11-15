@@ -1,0 +1,1 @@
+-- Academic tenant integrity constraints.
