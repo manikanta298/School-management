@@ -104,8 +104,8 @@ test('deactivation, assignment edits/removal and dependent-record integrity',asy
 test('roster pagination and validation preserve assignment boundaries',async()=>{
  for(let index=0;index<25;index++){
   const {rows:[u]}=await query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'student') RETURNING id",[`Additional ${index}`,`additional${index}@example.com`,hash]);
-  const {rows:[s]}=await query('INSERT INTO students(user_id,admission_number,admission_date) VALUES($1,$2,$3) RETURNING id',[u.id,`EXTRA-${index}`,'2025-01-01']);
-  await query("INSERT INTO enrollments(student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,$5)",[s.id,ids.y1,ids.c1,ids.a,'2025-06-01']);
+  const {rows:[s]}=await query('INSERT INTO students(school_id,user_id,admission_number,admission_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolA,u.id,`EXTRA-${index}`,'2025-01-01']);
+  await query("INSERT INTO enrollments(school_id,student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,$5,$6)",[schoolA,s.id,ids.y1,ids.c1,ids.a,'2025-06-01']);
  }
  const roster=`teachers/${ids.t2}/assignments/${ids.scienceAssignment}/roster`;
  let r=await call('get',roster+'?limit=25',undefined,'t2');assert.equal(r.body.items.length,25);
