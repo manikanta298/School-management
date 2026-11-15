@@ -140,5 +140,5 @@ test('student, parent, family links and enrollments are isolated by active schoo
  r=await callB('post','academic/sections',{name:'A',class_id:classB,capacity:10});assert.equal(r.status,201);const sectionB=r.body.item.id;
  r=await callB('post','students/'+studentIdB+'/enrollments',{academic_year_id:yearB,section_id:sectionB,enrolled_on:'2025-06-01',status:'active'});assert.equal(r.status,201);
  r=await callB('post','students/'+studentIdB+'/enrollments',{academic_year_id:ids.y1,section_id:ids.a,enrolled_on:'2025-06-01',status:'active'});assert.equal(r.status,409,'enrollments cannot reference another school year or section');
- const exportB=await callB('get','students/export.csv');assert.equal(exportB.status,404); // export is registered under the /students router; this URL intentionally checks route matching
+ const exportB=await callB('get','students/export.csv');assert.equal(exportB.status,200);assert.match(exportB.text,/ADM-S1/);
 });
