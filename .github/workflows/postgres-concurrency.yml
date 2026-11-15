@@ -1,0 +1,34 @@
+name: PostgreSQL concurrency
+on:
+  pull_request:
+    branches: [main, integration/school-audit-updates]
+  push:
+    branches: [integration/school-audit-updates]
+jobs:
+  transport-capacity:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm run test:postgres
+        working-directory: backend
+        env:
+          POSTGRES_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres

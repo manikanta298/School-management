@@ -9,6 +9,7 @@
     "seed:admin": "node database/seeds/admin.js",
     "db:backup": "node scripts/backup-postgres.js",
     "db:verify-backup": "node scripts/verify-postgres-backup.js",
+    "test:postgres": "node scripts/test-postgres-concurrency.js",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {
