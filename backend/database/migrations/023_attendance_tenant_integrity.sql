@@ -9,6 +9,9 @@ ALTER TABLE attendance_registers
   ADD CONSTRAINT attendance_registers_year_same_school_fk
     FOREIGN KEY (academic_year_id, school_id) REFERENCES academic_years(id, school_id) ON DELETE RESTRICT;
 
+ALTER TABLE enrollments
+  ADD CONSTRAINT enrollments_id_school_unique UNIQUE (id, school_id);
+
 ALTER TABLE attendance_entries
   ADD CONSTRAINT attendance_entries_id_school_unique UNIQUE (id, school_id),
   ADD CONSTRAINT attendance_entries_register_same_school_fk
