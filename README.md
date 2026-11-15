@@ -78,6 +78,8 @@ npm run build
 
 The API tests execute the actual SQL schema and HTTP handlers against PGlite (embedded PostgreSQL); they do not replace Docker/PostgreSQL acceptance testing. Test credentials are test-only. Docker and browser acceptance checks need to be run in an environment with those facilities.
 
+For a disposable local PostgreSQL 17 database, set `POSTGRES_TEST_DATABASE_URL` to a localhost URL and run `npm run test:postgres --prefix backend`. This runs real PostgreSQL transport capacity race checks in a temporary schema; it refuses non-local hosts and drops its schema on exit. CI runs this check on PostgreSQL 17 with Node.js 24.
+
 ## Commit this module
 
 Run from the repository root after reviewing `git diff` and testing:

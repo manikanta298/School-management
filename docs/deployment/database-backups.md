@@ -30,7 +30,13 @@ Run verification against a development or isolated staging database only. It cre
 
 ## Schedule and retain backups
 
-Configure a daily task using the operating system scheduler and an account permitted to run Docker Compose. For Windows Task Scheduler, use the repository root as **Start in**, run `npm.cmd`, and set the arguments to `run db:backup --prefix backend`. Configure scheduler logging and alert on any nonzero exit. Do not put credentials in the task arguments.
+On Windows, register a daily Task Scheduler job at 2:00 AM from the repository root:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File backend\scripts\register-postgres-backup-task.ps1
+```
+
+The task runs as the current user with limited privileges and only while that user is signed in. Docker Compose must be running. The wrapper logs output and the exit code under `%ProgramData%\SchoolManagement\postgres-backup.log`; inspect it regularly and configure monitoring for failures. The helper does not store credentials.
 
 Copy backups to an approved, access-controlled off-site destination, encrypt them in transit and at rest, and define retention based on the school's recovery requirements. The script does not upload, encrypt, prune, or monitor archives for you. Test restoration regularly against an isolated copy and keep the restore procedure and recovery contacts documented.
 
