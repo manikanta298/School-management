@@ -1210,7 +1210,10 @@ CREATE INDEX transport_vehicles_school_idx ON transport_vehicles(school_id);
 CREATE INDEX transport_routes_school_idx ON transport_routes(school_id);
 CREATE INDEX transport_stops_school_idx ON transport_stops(school_id);
 CREATE INDEX transport_allocations_school_idx ON transport_allocations(school_id);
-\n\n-- Academic tenant integrity snapshot (migration 020).\n-- Scope academic catalogue records and enforce same-school parent relationships.
+
+
+-- Academic tenant integrity snapshot (migration 020).
+-- Scope academic catalogue records and enforce same-school parent relationships.
 ALTER TABLE academic_years
   ADD CONSTRAINT academic_years_id_school_unique UNIQUE (id, school_id);
 ALTER TABLE terms
@@ -1258,4 +1261,4 @@ CREATE UNIQUE INDEX subjects_school_code_unique
 CREATE UNIQUE INDEX subjects_school_name_unique
   ON subjects(school_id, lower(name));
 CREATE INDEX subjects_school_idx ON subjects(school_id);
-\n
+
