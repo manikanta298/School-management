@@ -60,7 +60,7 @@ test('academic catalogue is isolated and parent references cannot cross schools'
  let r=await callB('get','academic-years');assert.equal(r.status,200);assert.equal(r.body.items.length,0);
  r=await callB('post','academic-years',{name:'2026–2027',start_date:'2026-06-01',end_date:'2027-05-31',is_current:true});assert.equal(r.status,201);const yearB=r.body.item.id;
  r=await callB('post','classes',{name:'Grade 1',academic_year_id:'00000000-0000-4000-8000-000000000000'});assert.equal(r.status,409);
- const yearA=(await query("SELECT id FROM academic_years WHERE school_id=$1 LIMIT 1",[schoolA])).rows[0].id;
+ const schoolAYear=await call('post','academic-years',{name:'2026–2027',start_date:'2026-06-01',end_date:'2027-05-31',is_current:true});assert.equal(schoolAYear.status,201);const yearA=schoolAYear.body.item.id;
  r=await callB('post','classes',{name:'Hijack',academic_year_id:yearA});assert.equal(r.status,409,'school B cannot reference school A academic year');
  r=await callB('get',`academic-years/${yearA}`);assert.equal(r.status,404);
  r=await callB('put',`academic-years/${yearA}`,{name:'Changed',start_date:'2026-06-01',end_date:'2027-05-31',is_current:false});assert.equal(r.status,404);
