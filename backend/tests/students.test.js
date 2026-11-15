@@ -10,8 +10,9 @@ await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const password='StudentsPassword!123',hash=await hashPassword(password),accounts={},tokens={},ids={};
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
 for(const [key,role] of [['admin','admin'],['teacher','teacher'],['s1','student'],['s2','student'],['s3','student'],['p1','parent'],['p2','parent'],['outsider','parent']]){
- const r=await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key}@example.com`,hash,role]);accounts[key]=r.rows[0].id;
+ const r=await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key}@example.com`,hash,role]);accounts[key]=r.rows[0].id;await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolA,accounts[key],role]);
  const login=await request(app).post('/api/auth/login').send({email:`${key}@example.com`,password});assert.equal(login.status,200);tokens[key]=login.body.accessToken;
 }
 const call=(method,path,body,who='admin')=>{let req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
@@ -116,4 +117,28 @@ test('profile fields, lifecycle status changes close enrollments and keep histor
  r=await call('get',`students/${ids.s1}/status-history`,undefined,'s1');assert.equal(r.status,403);
  await assert.rejects(query('DELETE FROM student_status_history'),/append-only/);
  r=await call('post',`students/00000000-0000-4000-8000-000000000999/status`,{status:'inactive',reason:'Unknown student'});assert.equal(r.status,404);
+});
+
+test('student, parent, family links and enrollments are isolated by active school',async()=>{
+ const schoolB=(await query("INSERT INTO schools(name,slug) VALUES('Second School','second-school') RETURNING id")).rows[0].id;
+ const makeUser=async(name,role)=>{const email=name.toLowerCase().replaceAll(' ','-')+'@example.com';const id=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[name,email,hash,role])).rows[0].id;await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolB,id,role]);return {id,email};};
+ const adminB=await makeUser('Admin B','admin'),studentB=await makeUser('Student B','student'),parentB=await makeUser('Parent B','parent');
+ const login=await request(app).post('/api/auth/login').send({email:adminB.email,password});assert.equal(login.status,200);const tokenB=login.body.accessToken;
+ const callB=(method,path,body)=>{const req=request(app)[method]('/api/'+path).set('Authorization','Bearer '+tokenB);return body?req.send(body):req;};
+ let r=await callB('post','students',{user_id:studentB.id,admission_number:'ADM-S1',admission_date:'2025-01-01',date_of_birth:'2015-01-01',address:'School B'});assert.equal(r.status,201);const studentIdB=r.body.item.id;
+ r=await callB('post','parents',{user_id:parentB.id,phone:'+91 98765 43211',address:'Parent B'});assert.equal(r.status,201);const parentIdB=r.body.item.id;
+ r=await callB('get','students');assert.equal(r.body.items.length,1);assert.equal(r.body.items[0].id,studentIdB);
+ r=await callB('get','students/'+ids.s1);assert.equal(r.status,404);
+ r=await callB('put','students/'+ids.s1,{admission_number:'STOLEN',admission_date:'2025-01-01',date_of_birth:'2015-01-01',address:'Changed'});assert.equal(r.status,404);
+ r=await callB('delete','students/'+ids.s1);assert.equal(r.status,404);
+ r=await callB('get','parents/'+ids.p1);assert.equal(r.status,404);
+ r=await callB('post','students/'+studentIdB+'/parents',{parent_id:ids.p1,relationship:'guardian'});assert.equal(r.status,409,'family links cannot cross schools');
+ r=await callB('post','students/'+studentIdB+'/parents',{parent_id:parentIdB,relationship:'guardian'});assert.equal(r.status,201);
+ r=await callB('get','students/'+studentIdB+'/parents');assert.equal(r.body.items.length,1);assert.equal(r.body.items[0].parent_id,parentIdB);
+ r=await callB('post','academic/academic-years',{name:'B Year',start_date:'2025-06-01',end_date:'2026-05-31'});assert.equal(r.status,201);const yearB=r.body.item.id;
+ r=await callB('post','academic/classes',{name:'Grade B',academic_year_id:yearB});assert.equal(r.status,201);const classB=r.body.item.id;
+ r=await callB('post','academic/sections',{name:'A',class_id:classB,capacity:10});assert.equal(r.status,201);const sectionB=r.body.item.id;
+ r=await callB('post','students/'+studentIdB+'/enrollments',{academic_year_id:yearB,section_id:sectionB,enrolled_on:'2025-06-01',status:'active'});assert.equal(r.status,201);
+ r=await callB('post','students/'+studentIdB+'/enrollments',{academic_year_id:ids.y1,section_id:ids.a,enrolled_on:'2025-06-01',status:'active'});assert.equal(r.status,409,'enrollments cannot reference another school year or section');
+ const exportB=await callB('get','students/export.csv');assert.equal(exportB.status,200);assert.match(exportB.text,/ADM-S1/);
 });

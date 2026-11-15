@@ -19,8 +19,8 @@ teachersRouter.put('/:id/assignments/:assignmentId',admin,validate(v.assignment)
 teachersRouter.delete('/:id/assignments/:assignmentId',admin,c.removeAssignment);
 teachersRouter.get('/:id/assignments/:assignmentId/roster',query(v.rosterQuery),c.roster);
 teachersRouter.use((err,_req,res,next)=>{
- if(err.code==='23505')return res.status(409).json({message:'Duplicate employee/account profile, or class/subject already has a teacher'});
- if(err.code==='23503')return res.status(409).json({message:'Wrong account role, missing reference, or record still has dependent assignments'});
+ if(err.code==='23505')return res.status(409).json({message:'Duplicate employee/account profile, or class/subject already has a teacher in this school'});
+ if(err.code==='23503')return res.status(409).json({message:'Wrong account role, missing or cross-school reference, or record still has dependent assignments'});
  if(err.code==='23514')return res.status(400).json({message:'Invalid teacher status, joining date, or assignment. Assign an active teacher within their employment dates.'});
  next(err);
 });
