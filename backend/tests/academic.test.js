@@ -9,8 +9,8 @@ await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const password='AcademicPassword!123';const hash=await hashPassword(password);
-const schoolA=(await query(\"SELECT id FROM schools WHERE slug='existing-school'\")).rows[0].id;
-for(const role of ['admin','teacher','student','parent']){const user=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[role,`${role}@example.com`,hash,role])).rows[0].id;await query(\"INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)\",[schoolA,user,role]);}
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
+for(const role of ['admin','teacher','student','parent']){const user=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[role,`${role}@example.com`,hash,role])).rows[0].id;await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolA,user,role]);}
 after(async()=>{await db.close();await pool.end();});
 test('academic CRUD, role access, constraints, filters and pagination',async()=>{
  let r=await request(app).get('/api/academic/classes');assert.equal(r.status,401);
