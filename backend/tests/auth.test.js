@@ -10,13 +10,14 @@ const query=async(text,params)=>{const r=await db.query(text,params);return {...
 pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const password='StrongPassword!123',origin='http://localhost:5173';
-await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)',['Admin','admin@example.com',await hashPassword(password),'admin']);
+const {rows:[admin]}=await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',['Admin','admin@example.com',await hashPassword(password),'admin']);
+await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) SELECT id,$1,'admin','active',true FROM schools WHERE slug='existing-school'",[admin.id]);
 after(async()=>{await db.close();await pool.end();});
 test('HTTP and SQL: roles, sessions, replay, password changes and logout',async()=>{
  const login=async(email='admin@example.com',pass=password)=>request(app).post('/api/auth/login').send({email,password:pass});
  let r=await request(app).get('/api/users');assert.equal(r.status,401);
  r=await login('admin@example.com','wrong');assert.equal(r.status,401);
- r=await login();assert.equal(r.status,200);let token=r.body.accessToken,cookie=r.headers['set-cookie'][0].split(';')[0];assert.match(r.headers['set-cookie'][0],/HttpOnly/);assert.equal(r.body.user.password_hash,undefined);
+ r=await login();assert.equal(r.status,200);let token=r.body.accessToken,cookie=r.headers['set-cookie'][0].split(';')[0];assert.match(r.headers['set-cookie'][0],/HttpOnly/);assert.equal(r.body.user.password_hash,undefined);assert.ok(r.body.activeSchoolId);
  for(const role of ['teacher','student','parent']){
  r=await request(app).post('/api/users').set('Authorization',`Bearer ${token}`).send({name:role,email:`${role}@example.com`,password,role});assert.equal(r.status,201);
  const id=r.body.user.id;
