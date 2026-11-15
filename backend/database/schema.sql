@@ -1168,6 +1168,8 @@ ALTER TABLE transport_stops
   ADD CONSTRAINT transport_stops_id_school_unique UNIQUE (id, school_id);
 ALTER TABLE students
   ADD CONSTRAINT students_id_school_unique UNIQUE (id, school_id);
+ALTER TABLE academic_years
+  ADD CONSTRAINT academic_years_id_school_unique UNIQUE (id, school_id);
 
 -- Permit the same registration and route name in different schools.
 ALTER TABLE transport_vehicles
