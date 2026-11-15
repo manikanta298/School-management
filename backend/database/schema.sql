@@ -1266,7 +1266,15 @@ CREATE INDEX subjects_school_idx ON subjects(school_id);
 -- Enforce same-school ownership for student, parent, enrollment and family links.
 -- Migration 018 assigned all existing records to the initial school.
 ALTER TABLE parents
+  DROP CONSTRAINT IF EXISTS parents_user_id_key,
   ADD CONSTRAINT parents_id_school_unique UNIQUE (id, school_id);
+ALTER TABLE parents
+  ADD CONSTRAINT parents_school_user_unique UNIQUE (school_id, user_id);
+
+ALTER TABLE students
+  DROP CONSTRAINT IF EXISTS students_user_id_key;
+ALTER TABLE students
+  ADD CONSTRAINT students_school_user_unique UNIQUE (school_id, user_id);
 
 ALTER TABLE students
   DROP CONSTRAINT IF EXISTS students_admission_number_key;
