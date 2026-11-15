@@ -1158,7 +1158,6 @@ COMMENT ON COLUMN auth_sessions.active_school_id IS
 -- Transport tenant integrity snapshot (migration 019).
 -- Enforce school ownership throughout transport relationships.
 -- Migration 018 has already populated school_id for every existing row.
-BEGIN;
 
 ALTER TABLE transport_vehicles
   ADD CONSTRAINT transport_vehicles_id_school_unique UNIQUE (id, school_id);
