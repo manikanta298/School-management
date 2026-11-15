@@ -120,7 +120,7 @@ test('register pagination, enrollment-date eligibility and joining-date limits',
  r=await call('get',daily('a','2025-09-10')+'&offset=25');assert.equal(r.body.items.length,2);
  r=await call('put','attendance/register',mark([{student_id:ids.extra,status:'present'}],0,'2025-09-09'));assert.equal(r.status,400);
  await query('UPDATE teachers SET joining_date=$1 WHERE id=$2',['2025-09-11',ids.classTeacher]);
- await query("INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind) VALUES($1,$2,$3,'class_teacher')",[ids.classTeacher,ids.c1,ids.year]);
+ await query("INSERT INTO teacher_assignments(school_id,teacher_id,class_id,academic_year_id,kind) VALUES($1,$2,$3,$4,'class_teacher')",[schoolA,ids.classTeacher,ids.c1,ids.year]);
  r=await call('put','attendance/register',mark([{student_id:ids.extra,status:'present'}],0,'2025-09-10'),'classTeacher');assert.equal(r.status,400);
  r=await call('put','attendance/register',mark([{student_id:ids.extra,status:'present'}],0,'2025-09-10'));assert.equal(r.status,200);
  await assert.rejects(query('UPDATE attendance_entries SET student_id=$1 WHERE student_id=$2',[ids.s3,ids.extra]),e=>e.code==='23514');
@@ -138,4 +138,25 @@ test('half-day counts as half attendance and corrections keep audit history',asy
  r=await call('put','attendance/register',mark([entry('s3','present')],1,'2025-10-01','c','Arrived after all'));assert.equal(r.status,200);
  r=await call('get',`attendance/audit?section_id=${ids.c}&date=2025-10-01`);assert.deepEqual(r.body.items.map(a=>[a.previous_status,a.new_status]),[['half_day','present'],[null,'half_day']]);
  r=await call('put','attendance/register',mark([entry('s3','half-day')],0,'2025-10-04','c'));assert.equal(r.status,400);
+});
+
+test('attendance registers and records are isolated across schools',async()=>{
+ const schoolB=(await query("INSERT INTO schools(name,slug) VALUES('Attendance Second School','attendance-second-school') RETURNING id")).rows[0].id;
+ const makeUser=async(name,role)=>{const email=name+'@example.com';const id=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[name,email,hash,role]);await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolB,id,role]);return {id,email};};
+ const adminB=await makeUser('attendance-admin-b','admin'),studentB=await makeUser('attendance-student-b','student');
+ const login=await request(app).post('/api/auth/login').send({email:adminB.email,password:'AttendancePassword!123'});assert.equal(login.status,200);
+ const callB=(method,path,body)=>{const req=request(app)[method]('/api/'+path).set('Authorization','Bearer '+login.body.accessToken);return body?req.send(body):req;};
+ let r=await callB('get','attendance/sections');assert.equal(r.status,200);assert.deepEqual(r.body.items,[]);
+ r=await callB('get',daily());assert.equal(r.status,404);
+ r=await callB('put','attendance/register',mark([entry('s1','present')]));assert.equal(r.status,404);
+ const yearB=await insert('INSERT INTO academic_years(school_id,name,start_date,end_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolB,'B 2025–2026','2025-06-01','2026-05-31']);
+ const classB=await insert('INSERT INTO classes(school_id,name,academic_year_id) VALUES($1,$2,$3) RETURNING id',[schoolB,'B Class',yearB]);
+ const sectionB=await insert('INSERT INTO sections(school_id,name,class_id,capacity) VALUES($1,$2,$3,40) RETURNING id',[schoolB,'B Section',classB]);
+ const studentIdB=await insert('INSERT INTO students(school_id,user_id,admission_number,admission_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolB,studentB.id,'B-ADM-1','2025-01-01']);
+ await query('INSERT INTO enrollments(school_id,student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,$5,$6)',[schoolB,studentIdB,yearB,classB,sectionB,'2025-06-01']);
+ const payload={section_id:sectionB,date:'2025-09-01',expected_version:0,entries:[{student_id:studentIdB,status:'present'}]};
+ r=await callB('put','attendance/register',payload);assert.equal(r.status,200,JSON.stringify(r.body));
+ r=await callB('get',`attendance/register?section_id=${sectionB}&date=2025-09-01`);assert.equal(r.status,200);assert.equal(r.body.items.length,1);assert.equal(r.body.items[0].student_id,studentIdB);
+ assert.equal((await query('SELECT count(*)::int AS count FROM attendance_entries WHERE school_id=$1',[schoolB])).rows[0].count,1);
+ assert.equal((await query('SELECT count(*)::int AS count FROM attendance_entries WHERE school_id=$1',[schoolA])).rows[0].count,0);
 });
