@@ -9,20 +9,21 @@ await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const password='TeachersPassword!123',hash=await hashPassword(password),accounts={},tokens={},ids={};
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
 for(const [key,role] of [['admin','admin'],['t1','teacher'],['t2','teacher'],['t3','teacher'],['s1','student'],['s2','student'],['s3','student'],['parent','parent']]){
- const {rows:[u]}=await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key}@example.com`,hash,role]);accounts[key]=u.id;
+ const {rows:[u]}=await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key}@example.com`,hash,role]);accounts[key]=u.id;await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolA,u.id,role]);
  const logged=await request(app).post('/api/auth/login').send({email:`${key}@example.com`,password});assert.equal(logged.status,200);tokens[key]=logged.body.accessToken;
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
 const profile=(key,status='active')=>({employee_number:`EMP-${key}`,joining_date:'2021-01-01',phone:'+91 98765 43210',qualification:'B.Ed',employment_status:status});
-for(const key of ['y1','y2']){const {rows:[y]}=await query('INSERT INTO academic_years(name,start_date,end_date) VALUES($1,$2,$3) RETURNING id',[key,key==='y1'?'2025-06-01':'2020-01-01',key==='y1'?'2026-05-31':'2022-12-31']);ids[key]=y.id;}
-for(const [key,year] of [['c1','y1'],['c2','y1'],['old','y2']]){const {rows:[cl]}=await query('INSERT INTO classes(name,academic_year_id) VALUES($1,$2) RETURNING id',[key,ids[year]]);ids[key]=cl.id;}
-for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']]){const {rows:[s]}=await query('INSERT INTO sections(name,class_id,capacity) VALUES($1,$2,40) RETURNING id',[key,ids[cl]]);ids[key]=s.id;}
+for(const key of ['y1','y2']){const {rows:[y]}=await query('INSERT INTO academic_years(school_id,name,start_date,end_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolA,key,key==='y1'?'2025-06-01':'2020-01-01',key==='y1'?'2026-05-31':'2022-12-31']);ids[key]=y.id;}
+for(const [key,year] of [['c1','y1'],['c2','y1'],['old','y2']]){const {rows:[cl]}=await query('INSERT INTO classes(school_id,name,academic_year_id) VALUES($1,$2,$3) RETURNING id',[schoolA,key,ids[year]]);ids[key]=cl.id;}
+for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']]){const {rows:[s]}=await query('INSERT INTO sections(school_id,name,class_id,capacity) VALUES($1,$2,$3,40) RETURNING id',[schoolA,key,ids[cl]]);ids[key]=s.id;}
 for(const [key,section,cl,status] of [['s1','a','c1','active'],['s2','b','c1','withdrawn'],['s3','c','c2','active']]){
- const {rows:[s]}=await query('INSERT INTO students(user_id,admission_number,admission_date,date_of_birth,address) VALUES($1,$2,$3,$4,$5) RETURNING id',[accounts[key],`ADM-${key.toUpperCase()}`,'2025-01-01','2015-01-01','PRIVATE ADDRESS']);ids[key]=s.id;
- await query('INSERT INTO enrollments(student_id,academic_year_id,class_id,section_id,enrolled_on,status) VALUES($1,$2,$3,$4,$5,$6)',[s.id,ids.y1,ids[cl],ids[section],'2025-06-01',status]);
+ const {rows:[s]}=await query('INSERT INTO students(school_id,user_id,admission_number,admission_date,date_of_birth,address) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[schoolA,accounts[key],`ADM-${key.toUpperCase()}`,'2025-01-01','2015-01-01','PRIVATE ADDRESS']);ids[key]=s.id;
+ await query('INSERT INTO enrollments(school_id,student_id,academic_year_id,class_id,section_id,enrolled_on,status) VALUES($1,$2,$3,$4,$5,$6,$7)',[schoolA,s.id,ids.y1,ids[cl],ids[section],'2025-06-01',status]);
 }
-for(const key of ['math','science']){const {rows:[s]}=await query('INSERT INTO subjects(name,code) VALUES($1,$2) RETURNING id',[key,key.toUpperCase()]);ids[key]=s.id;}
+for(const key of ['math','science']){const {rows:[s]}=await query('INSERT INTO subjects(school_id,name,code) VALUES($1,$2,$3) RETURNING id',[schoolA,key,key.toUpperCase()]);ids[key]=s.id;}
 after(async()=>{await db.close();await pool.end();});
 test('teacher profile CRUD and own-profile authorization',async()=>{
  let r=await request(app).get('/api/teachers');assert.equal(r.status,401);
@@ -113,4 +114,24 @@ test('roster pagination and validation preserve assignment boundaries',async()=>
  await assert.rejects(query('UPDATE users SET role=$1 WHERE id=$2',['parent',accounts.t2]),e=>e.code==='23503');
  await assert.rejects(query('INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind,subject_id) VALUES($1,$2,$3,$4,$5)',[ids.t2,ids.c2,ids.y1,'class_teacher',ids.math]),e=>e.code==='23514');
  await assert.rejects(query('INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind) VALUES($1,$2,$3,$4)',[ids.t2,ids.old,ids.y1,'class_teacher']),e=>e.code==='23503');
+});
+
+
+test('teacher profiles and assignments are isolated across schools',async()=>{
+ const schoolB=(await query("INSERT INTO schools(name,slug) VALUES('Teacher Test School','teacher-test-school') RETURNING id")).rows[0].id;
+ const make=async(name,role)=>{const email=name+'@example.com';const id=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[name,email,hash,role])).rows[0].id;await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolB,id,role]);return {id,email};};
+ const adminB=await make('admin-b','admin'),teacherB=await make('teacher-b','teacher');
+ const logged=await request(app).post('/api/auth/login').send({email:adminB.email,password});assert.equal(logged.status,200);const tokenB=logged.body.accessToken;
+ const callB=(method,path,body)=>{const req=request(app)[method]('/api/'+path).set('Authorization','Bearer '+tokenB);return body?req.send(body):req;};
+ let r=await callB('post','teachers',{user_id:teacherB.id,...profile('t1')});assert.equal(r.status,201);const teacherIdB=r.body.item.id;
+ r=await callB('get','teachers');assert.equal(r.body.items.length,1);assert.equal(r.body.items[0].id,teacherIdB);
+ r=await callB('get','teachers/'+ids.t1);assert.equal(r.status,404);
+ r=await callB('put','teachers/'+ids.t1,profile('hijack'));assert.equal(r.status,404);
+ r=await callB('delete','teachers/'+ids.t1);assert.equal(r.status,404);
+ r=await callB('post','teachers/'+teacherIdB+'/assignments',{class_id:ids.c1,kind:'class_teacher'});assert.equal(r.status,409,'cannot assign a teacher to another school class');
+ const yearB=(await query('INSERT INTO academic_years(school_id,name,start_date,end_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolB,'B Year','2025-06-01','2026-05-31'])).rows[0].id;
+ const classB=(await query('INSERT INTO classes(school_id,name,academic_year_id) VALUES($1,$2,$3) RETURNING id',[schoolB,'B Class',yearB])).rows[0].id;
+ r=await callB('post','teachers/'+teacherIdB+'/assignments',{class_id:classB,kind:'class_teacher'});assert.equal(r.status,201);
+ const teacherC=await make('teacher-c','teacher');
+ r=await callB('post','teachers',{user_id:teacherC.id,...profile('t1')});assert.equal(r.status,201,'employee number may repeat across schools');
 });
