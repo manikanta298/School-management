@@ -18,6 +18,7 @@ export const statusChange=z.object({status:z.enum(['active','inactive','transfer
 export const listQuery=z.object({limit:z.coerce.number().int().min(1).max(100).default(25),offset:z.coerce.number().int().min(0).default(0),q:z.string().trim().max(100).default(''),parent_id:z.uuid().optional(),academic_year_id:z.uuid().optional(),section_id:z.uuid().optional(),status:z.enum(['active','inactive','transferred','graduated']).optional()}).strict();
 const updatable=['date_of_birth','address',...Object.keys(profileFields)];
 export const bulkColumns=updatable;
-const bulkRowSchema=z.object({admission_number:studentFields.admission_number,...Object.fromEntries(updatable.map(k=>[k,studentFields[k]]))}).strict();
+const exportedReferenceFields={name:z.string().trim().min(1).max(100).optional(),email:z.email().max(254).optional(),lifecycle_status:z.enum(['active','inactive','transferred','graduated']).optional(),admission_date:date.optional()};
+const bulkRowSchema=z.object({admission_number:studentFields.admission_number,...exportedReferenceFields,...Object.fromEntries(updatable.map(k=>[k,studentFields[k]]))}).strict();
 export const bulkUpdate=z.object({dry_run:z.boolean().default(true),rows:z.array(z.record(z.string(),z.unknown())).min(1).max(200)}).strict();
 export const parseBulkRow=raw=>bulkRowSchema.safeParse(raw);
