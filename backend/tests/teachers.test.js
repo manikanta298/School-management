@@ -129,6 +129,7 @@ test('teacher profiles and assignments are isolated across schools',async()=>{
  r=await callB('put','teachers/'+ids.t2,profile('hijack'));assert.equal(r.status,404);
  r=await callB('delete','teachers/'+ids.t2);assert.equal(r.status,404);
  r=await callB('post','teachers/'+teacherIdB+'/assignments',{class_id:ids.c1,kind:'class_teacher'});assert.equal(r.status,404,'cannot assign a teacher to another school class');
+ await assert.rejects(query('INSERT INTO teacher_assignments(school_id,teacher_id,class_id,academic_year_id,kind) VALUES($1,$2,$3,$4,$5)',[schoolB,teacherIdB,ids.c1,ids.y1,'class_teacher']),e=>e.code==='23503');
  const yearB=(await query('INSERT INTO academic_years(school_id,name,start_date,end_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolB,'B Year','2025-06-01','2026-05-31'])).rows[0].id;
  const classB=(await query('INSERT INTO classes(school_id,name,academic_year_id) VALUES($1,$2,$3) RETURNING id',[schoolB,'B Class',yearB])).rows[0].id;
  r=await callB('post','teachers/'+teacherIdB+'/assignments',{class_id:classB,kind:'class_teacher'});assert.equal(r.status,201);
