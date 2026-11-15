@@ -5,6 +5,7 @@ import StudentDetails from './StudentDetails';
 import StudentExchange from './StudentExchange';
 const dateOnly=value=>String(value??'').slice(0,10);
 const emptyOptions={accounts:[],parents:[],years:[],classes:[],sections:[]};
+const studentProfileFields=[['gender','Gender'],['blood_group','Blood group'],['nationality','Nationality'],['present_address','Present address'],['city','City'],['district','District'],['state','State'],['pin_code','PIN code'],['previous_school','Previous school'],['previous_class','Previous class']];
 async function accountOptions(){
  const users=[];for(let offset=0;;offset+=100){const data=await api(`/users?limit=100&offset=${offset}`);users.push(...data.users);if(data.users.length<100)return users;}
 }
@@ -20,9 +21,9 @@ export default function StudentsParents({user}){
   load().catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
  },[kind,offset,q,revision,admin]);
  function tab(value){setKind(value);setOffset(0);setSearch('');setQ('');setEditing(null);setDraft({});setSelected(null);setRemoving(null);setNotice('');}
- function edit(item){setEditing(item.id);setSelected(null);setRemoving(null);setDraft(kind==='students'?{admission_number:item.admission_number,admission_date:dateOnly(item.admission_date),date_of_birth:dateOnly(item.date_of_birth),address:item.address||''}:{phone:item.phone||'',address:item.address||''});}
+ function edit(item){setEditing(item.id);setSelected(null);setRemoving(null);setDraft(kind==='students'?{admission_number:item.admission_number,admission_date:dateOnly(item.admission_date),date_of_birth:dateOnly(item.date_of_birth),address:item.address||'',...Object.fromEntries(studentProfileFields.map(([key])=>[key,item[key]||'']))}:{phone:item.phone||'',address:item.address||''});}
  async function save(e){e.preventDefault();setBusy(true);setError('');setNotice('');
-  const body=kind==='students'?{admission_number:draft.admission_number,admission_date:draft.admission_date,date_of_birth:draft.date_of_birth||null,address:draft.address||null}:{phone:draft.phone||null,address:draft.address||null};if(!editing)body.user_id=draft.user_id;
+    const body=kind==='students'?{admission_number:draft.admission_number,admission_date:draft.admission_date,date_of_birth:draft.date_of_birth||null,address:draft.address||null,...Object.fromEntries(studentProfileFields.map(([key])=>[key,draft[key]||null]))}:{phone:draft.phone||null,address:draft.address||null};if(!editing)body.user_id=draft.user_id;
   try{await api(`/${kind}${editing?'/'+editing:''}`,{method:editing?'PUT':'POST',body});setEditing(null);setDraft({});setSelected(null);setOffset(0);setRevision(v=>v+1);setNotice('Profile saved.');}catch(e){setError(e.message);}finally{setBusy(false);}
  }
  async function remove(){setBusy(true);setError('');try{await api(`/${kind}/${removing.id}`,{method:'DELETE'});setRemoving(null);setSelected(null);setEditing(null);setDraft({});setOffset(0);setRevision(v=>v+1);setNotice('Profile deleted. The login account is retained.');}catch(e){setError(e.message);}finally{setBusy(false);}}
@@ -34,7 +35,7 @@ export default function StudentsParents({user}){
  {loading?<p role="status">Loading profiles…</p>:<div className={admin?'grid':''}>
  {admin&&<div className="card"><h2>{editing?'Edit':'Create'} {kind==='students'?'student':'parent'} profile</h2><form onSubmit={save}>
  {!editing&&<label>Existing {kind==='students'?'student':'parent'} account<select required value={draft.user_id||''} onChange={e=>setDraft({...draft,user_id:e.target.value})}><option value="">Select account</option>{options.accounts.filter(u=>u.role===(kind==='students'?'student':'parent')).map(u=><option key={u.id} value={u.id}>{u.name} · {u.email}</option>)}</select></label>}
- {kind==='students'?<>{input('admission_number','Admission number','text',true,30)}{input('admission_date','Admission date','date',true)}{input('date_of_birth','Date of birth (optional)','date')}</>:input('phone','Phone (optional)','tel',false,30)}
+ {kind==='students'?<>{input('admission_number','Admission number','text',true,30)}{input('admission_date','Admission date','date',true)}{input('date_of_birth','Date of birth (optional)','date')}{studentProfileFields.map(([key,label])=>input(key,label,key==='present_address'?'text':'text',false,key==='present_address'?500:100))}</>:input('phone','Phone (optional)','tel',false,30)}
  <label>Address (optional)<textarea maxLength={500} rows={3} value={draft.address||''} onChange={e=>setDraft({...draft,address:e.target.value})}/></label>
  <button disabled={busy}>Save profile</button> {editing&&<button type="button" disabled={busy} onClick={()=>{setEditing(null);setDraft({});}}>Cancel edit</button>}</form></div>}
  <div><h2>{kind==='students'?'Students':'Parents'}</h2>{!items.length&&<p>No matching profiles. {admin?'Create an account and profile to get started.':'Your school may not have set up your profile or family links yet.'}</p>}{items.map(item=><article className="card" key={item.id}><h3>{item.name}</h3><p>{item.email}</p>{kind==='students'?<><p>Admission: {item.admission_number} · {dateOnly(item.admission_date)}</p>{item.date_of_birth&&<p>Date of birth: {dateOnly(item.date_of_birth)}</p>}</>:item.phone&&<p>Phone: {item.phone}</p>}{item.address&&<p className="address">{item.address}</p>}

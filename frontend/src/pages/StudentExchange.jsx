@@ -10,7 +10,7 @@ export default function StudentExchange(){
  }
  async function apply(){setBusy(true);setError('');try{const result=await api('/students/bulk-update',{method:'POST',body:{dry_run:false,rows}});setPreview(result);if(result.applied){setNotice(`${result.results.length} student record(s) updated.`);setRows([]);}}catch(e){setError(e.message);}finally{setBusy(false);}}
  return <section className="card" aria-label="Student data exchange"><h2>Export and bulk update</h2>
- <p>Download all student profiles as CSV, edit the columns you want to change, and upload the file. Rows are matched by admission_number. Empty cells are ignored. Up to 200 rows per file; nothing is saved unless every row is valid.</p>
+ <p>Download all student profiles as CSV, edit the profile columns, and upload the file. Rows are matched by admission_number. Name, email, status, and admission date are reference-only. Empty cells are ignored. Up to 200 rows per file; nothing is saved unless every row is valid.</p>
  <button disabled={busy} onClick={download}>Download students CSV</button>
  <label>Upload CSV for bulk update<input type="file" accept=".csv,text/csv" onChange={choose} disabled={busy}/></label>
  {error&&<p className="error" role="alert">{error}</p>}{notice&&<p className="notice" role="status">{notice}</p>}

@@ -67,4 +67,9 @@ test('allocations are scoped, unique per year and limited by vehicle capacity',a
  r=await call('delete',`transport/allocations/${ids.a2}`);assert.equal(r.status,204);
  r=await call('post','transport/allocations',body('s3'));assert.equal(r.status,201);
  r=await call('delete',`transport/allocations/${ids.a2}`);assert.equal(r.status,404);
+ const south=await call('post','transport/routes',{name:'South',vehicle_id:null});assert.equal(south.status,201);
+ const southStop=await call('post',`transport/routes/${south.body.item.id}/stops`,{name:'Hill',sequence:1});assert.equal(southStop.status,201);
+ r=await call('post','transport/allocations',body('s2',southStop.body.item.stops[0].id));assert.equal(r.status,201);
+ r=await call('put',`transport/routes/${south.body.item.id}`,{name:'South',vehicle_id:ids.bus,active:true});assert.equal(r.status,400);
+ r=await call('get','transport/allocations');assert.equal(r.body.items.find(a=>a.student_id===ids.s2).vehicle_registration,null);
 });

@@ -40,6 +40,11 @@ test('bulk update previews, validates every row and applies atomically',async()=
  const one=await student(1),two=await student(2);assert.equal(one.city,'Hyderabad');assert.equal(one.pin_code,'500001');assert.equal(one.date_of_birth.toISOString?.().slice(0,10)??String(one.date_of_birth).slice(0,10),'2015-05-05');assert.equal(two.gender,'female');assert.equal(two.blood_group,'O+');
  r=await call('post','students/bulk-update',{dry_run:false,rows:[{admission_number:'ADM1',city:null}]});assert.equal(r.body.applied,true);assert.equal((await student(1)).city,null);
 });
+test('CSV export reference columns round-trip but cannot modify identity fields',async()=>{
+ const row={admission_number:'ADM1',name:'Pupil 1',email:'pupil1@example.com',lifecycle_status:'active',admission_date:'2025-01-01',city:'Updated city'};
+ const r=await call('post','students/bulk-update',{dry_run:false,rows:[row]});assert.equal(r.status,200);assert.equal(r.body.applied,true);assert.deepEqual(r.body.results[0].fields,['city']);
+ assert.equal((await student(1)).city,'Updated city');assert.equal((await student(1)).admission_number,'ADM1');
+});
 test('bulk update rejects malformed envelopes and non-admins',async()=>{
  for(const body of [{rows:[]},{rows:Array.from({length:201},(_,i)=>({admission_number:`A${i}`}))},{rows:[{admission_number:'ADM1'}],extra:1},{rows:'x'},{dry_run:'yes',rows:[{admission_number:'ADM1'}]}]){const r=await call('post','students/bulk-update',body);assert.equal(r.status,400);}
  for(const who of ['teacher','student','parent']){const r=await call('post','students/bulk-update',{rows:[{admission_number:'ADM1',city:'X'}]},who);assert.equal(r.status,403);}
