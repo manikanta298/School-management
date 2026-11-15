@@ -39,12 +39,12 @@ try{
  const vehicle=(await insert("INSERT INTO transport_vehicles(registration_number,capacity,school_id) VALUES('TEST-1',1,$1) RETURNING id",[schoolId])).id;
  const routeA=(await insert('INSERT INTO transport_routes(name,vehicle_id,school_id) VALUES($1,$2,$3) RETURNING id',['Route A',vehicle,schoolId])).id;
  const routeB=(await insert('INSERT INTO transport_routes(name,school_id) VALUES($1,$2) RETURNING id',['Route B',schoolId])).id;
- const stopA=(await insert('INSERT INTO transport_stops(route_id,name,sequence) VALUES($1,$2,1) RETURNING id',[routeA,'A'])).id;
- const stopB=(await insert('INSERT INTO transport_stops(route_id,name,sequence) VALUES($1,$2,1) RETURNING id',[routeB,'B'])).id;
+ const stopA=(await insert('INSERT INTO transport_stops(route_id,name,sequence,school_id) VALUES($1,$2,1,$3) RETURNING id',[routeA,'A',schoolId])).id;
+ const stopB=(await insert('INSERT INTO transport_stops(route_id,name,sequence,school_id) VALUES($1,$2,1,$3) RETURNING id',[routeB,'B',schoolId])).id;
  await testPool.query('INSERT INTO transport_allocations(student_id,stop_id,academic_year_id,school_id) VALUES($1,$2,$3,$4)',[studentIds[0],stopB,year,schoolId]);
 
  const operations=await Promise.allSettled([
-  testPool.query('INSERT INTO transport_allocations(student_id,stop_id,academic_year_id) VALUES($1,$2,$3)',[studentIds[1],stopA,year,schoolId]),
+  testPool.query('INSERT INTO transport_allocations(student_id,stop_id,academic_year_id,school_id) VALUES($1,$2,$3,$4)',[studentIds[1],stopA,year,schoolId]),
   testPool.query('UPDATE transport_routes SET vehicle_id=$1 WHERE id=$2',[vehicle,routeB]),
  ]);
  const committed=operations.filter(result=>result.status==='fulfilled').length;
