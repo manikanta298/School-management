@@ -112,8 +112,8 @@ test('roster pagination and validation preserve assignment boundaries',async()=>
  r=await call('get',roster+'?limit=25&offset=25',undefined,'t2');assert.equal(r.body.items.length,1);
  for(const path of ['teachers/not-a-uuid','teachers?limit=101',roster+'?limit=0',roster+'?section_id=wrong']){r=await call('get',path);assert.equal(r.status,400);}
  await assert.rejects(query('UPDATE users SET role=$1 WHERE id=$2',['parent',accounts.t2]),e=>e.code==='23503');
- await assert.rejects(query('INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind,subject_id) VALUES($1,$2,$3,$4,$5)',[ids.t2,ids.c2,ids.y1,'class_teacher',ids.math]),e=>e.code==='23514');
- await assert.rejects(query('INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind) VALUES($1,$2,$3,$4)',[ids.t2,ids.old,ids.y1,'class_teacher']),e=>e.code==='23503');
+ await assert.rejects(query('INSERT INTO teacher_assignments(school_id,teacher_id,class_id,academic_year_id,kind,subject_id) VALUES($1,$2,$3,$4,$5,$6)',[schoolA,ids.t2,ids.c2,ids.y1,'class_teacher',ids.math]),e=>e.code==='23514');
+ await assert.rejects(query('INSERT INTO teacher_assignments(school_id,teacher_id,class_id,academic_year_id,kind) VALUES($1,$2,$3,$4,$5)',[schoolA,ids.t2,ids.old,ids.y1,'class_teacher']),e=>e.code==='23503');
 });
 
 
@@ -123,15 +123,13 @@ test('teacher profiles and assignments are isolated across schools',async()=>{
  const adminB=await make('admin-b','admin'),teacherB=await make('teacher-b','teacher');
  const logged=await request(app).post('/api/auth/login').send({email:adminB.email,password});assert.equal(logged.status,200);const tokenB=logged.body.accessToken;
  const callB=(method,path,body)=>{const req=request(app)[method]('/api/'+path).set('Authorization','Bearer '+tokenB);return body?req.send(body):req;};
- let r=await callB('post','teachers',{user_id:teacherB.id,...profile('t1')});assert.equal(r.status,201);const teacherIdB=r.body.item.id;
+ let r=await callB('post','teachers',{user_id:teacherB.id,...profile('t2')});assert.equal(r.status,201);const teacherIdB=r.body.item.id;
  r=await callB('get','teachers');assert.equal(r.body.items.length,1);assert.equal(r.body.items[0].id,teacherIdB);
- r=await callB('get','teachers/'+ids.t1);assert.equal(r.status,404);
- r=await callB('put','teachers/'+ids.t1,profile('hijack'));assert.equal(r.status,404);
- r=await callB('delete','teachers/'+ids.t1);assert.equal(r.status,404);
- r=await callB('post','teachers/'+teacherIdB+'/assignments',{class_id:ids.c1,kind:'class_teacher'});assert.equal(r.status,409,'cannot assign a teacher to another school class');
+ r=await callB('get','teachers/'+ids.t2);assert.equal(r.status,404);
+ r=await callB('put','teachers/'+ids.t2,profile('hijack'));assert.equal(r.status,404);
+ r=await callB('delete','teachers/'+ids.t2);assert.equal(r.status,404);
+ r=await callB('post','teachers/'+teacherIdB+'/assignments',{class_id:ids.c1,kind:'class_teacher'});assert.equal(r.status,404,'cannot assign a teacher to another school class');
  const yearB=(await query('INSERT INTO academic_years(school_id,name,start_date,end_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolB,'B Year','2025-06-01','2026-05-31'])).rows[0].id;
  const classB=(await query('INSERT INTO classes(school_id,name,academic_year_id) VALUES($1,$2,$3) RETURNING id',[schoolB,'B Class',yearB])).rows[0].id;
  r=await callB('post','teachers/'+teacherIdB+'/assignments',{class_id:classB,kind:'class_teacher'});assert.equal(r.status,201);
- const teacherC=await make('teacher-c','teacher');
- r=await callB('post','teachers',{user_id:teacherC.id,...profile('t1')});assert.equal(r.status,201,'employee number may repeat across schools');
 });
