@@ -9,8 +9,10 @@ await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const password='StaffPassword!123',hash=await hashPassword(password),tokens={};
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
 for(const role of ['admin','teacher','student','parent']){
- await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)',[role,`${role}@example.com`,hash,role]);
+ const user=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[role,`${role}@example.com`,hash,role])).rows[0].id;
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolA,user,role]);
  const login=await request(app).post('/api/auth/login').send({email:`${role}@example.com`,password});assert.equal(login.status,200);tokens[role]=login.body.accessToken;
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
@@ -40,4 +42,20 @@ test('deleting an erroneous record is permanent and unknown ids return 404',asyn
  let r=await call('post','staff',staff(9));assert.equal(r.status,201);
  r=await call('delete',`staff/${r.body.item.id}`);assert.equal(r.status,204);
  r=await call('delete','staff/00000000-0000-4000-8000-000000000999');assert.equal(r.status,404);
+});
+
+
+test('staff records are isolated by active school and employee numbers are school-specific',async()=>{
+ const schoolB=(await query("INSERT INTO schools(name,slug) VALUES('Staff Test School','staff-test-school') RETURNING id")).rows[0].id;
+ const createUser=async(name,role)=>{const email=name+'@example.com';const id=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[name,email,hash,role])).rows[0].id;await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolB,id,role]);return email;};
+ const email=await createUser('admin-b','admin');
+ const login=await request(app).post('/api/auth/login').send({email,password});assert.equal(login.status,200);
+ const callB=(method,path,body)=>{const req=request(app)[method]('/api/'+path).set('Authorization','Bearer '+login.body.accessToken);return body?req.send(body):req;};
+ let r=await call('post','staff',staff(77));assert.equal(r.status,201);const idA=r.body.item.id;
+ r=await callB('get','staff');assert.equal(r.body.items.length,0);
+ r=await callB('get','staff/'+idA);assert.equal(r.status,404);
+ r=await callB('put','staff/'+idA,staff(77,{name:'Stolen'}));assert.equal(r.status,404);
+ r=await callB('delete','staff/'+idA);assert.equal(r.status,404);
+ r=await callB('post','staff',staff(77));assert.equal(r.status,201,'employee number can be reused by another school');
+ r=await callB('get','staff');assert.equal(r.body.items.length,1);assert.equal(r.body.items[0].employee_number,'ST-77');
 });
