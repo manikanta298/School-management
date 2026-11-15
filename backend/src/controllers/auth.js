@@ -3,7 +3,7 @@ import * as auth from '../services/auth.js';
 import { pool } from '../config/db.js';
 import { env } from '../config/env.js';
 const cookieOptions={httpOnly:true,secure:env.NODE_ENV==='production',sameSite:'strict',path:'/api/auth'};
-function sendSession(res,result) {res.cookie('refreshToken',result.refresh,{...cookieOptions,maxAge:7*86400000});res.json({accessToken:result.accessToken,user:result.user});}
+function sendSession(res,result) {res.cookie('refreshToken',result.refresh,{...cookieOptions,maxAge:7*86400000});res.json({accessToken:result.accessToken,user:result.user,activeSchoolId:result.schoolId});}
 export async function login(req,res) {
  const user=await users.byEmail(req.body.email);
  const valid=await auth.matches(req.body.password,user?.password_hash || auth.dummyHash);
@@ -21,14 +21,14 @@ export async function changePassword(req,res) {
  await auth.replacePassword(user.id,await auth.hashPassword(req.body.newPassword));
  res.clearCookie('refreshToken',cookieOptions);res.status(204).end();
 }
-export async function createUser(req,res) {res.status(201).json({user:await users.create(req.body,await auth.hashPassword(req.body.password))});}
+export async function createUser(req,res) {res.status(201).json({user:await users.create(req.body,await auth.hashPassword(req.body.password),req.schoolId)});}
 export async function listUsers(req,res) {
  const limit=Number(req.query.limit??25),offset=Number(req.query.offset??0);
  if(!Number.isInteger(limit)||limit<1||limit>100||!Number.isInteger(offset)||offset<0) throw auth.fail(400,'Invalid pagination');
- res.json({users:await users.list(limit,offset)});
+ res.json({users:await users.list(limit,offset,req.schoolId)});
 }
 export async function resetPassword(req,res) {
  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) throw auth.fail(400,'Invalid user ID');
- if(!await users.byId(req.params.id)) throw auth.fail(404,'User not found');
+ if(!await users.byId(req.params.id,req.schoolId)) throw auth.fail(404,'User not found');
  await auth.replacePassword(req.params.id,await auth.hashPassword(req.body.newPassword));res.status(204).end();
 }

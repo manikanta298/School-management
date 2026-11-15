@@ -11,6 +11,9 @@ export async function bootstrapAdmin(pool, source) {
  const existing = await pool.query('SELECT id FROM users WHERE email=$1', [data.email]);
  if (existing.rowCount) return 'existing';
  const hash = await bcrypt.hash(data.password, 12);
- const result = await pool.query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'admin') ON CONFLICT(email) DO NOTHING RETURNING id", [data.name, data.email, hash]);
+ const result = await pool.query(
+  "WITH created AS (INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'admin') ON CONFLICT(email) DO NOTHING RETURNING id) INSERT INTO school_memberships(school_id,user_id,role,status,is_default) SELECT s.id,created.id,'admin','active',true FROM schools s CROSS JOIN created WHERE s.slug='existing-school' RETURNING user_id",
+  [data.name, data.email, hash]
+ );
  return result.rowCount ? 'created' : 'existing';
 }
