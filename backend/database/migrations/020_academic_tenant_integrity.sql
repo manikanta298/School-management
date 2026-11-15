@@ -1,6 +1,4 @@
 -- Scope academic catalogue records and enforce same-school parent relationships.
-ALTER TABLE academic_years
-  ADD CONSTRAINT academic_years_id_school_unique UNIQUE (id, school_id);
 ALTER TABLE terms
   ADD CONSTRAINT terms_id_school_unique UNIQUE (id, school_id);
 ALTER TABLE classes
