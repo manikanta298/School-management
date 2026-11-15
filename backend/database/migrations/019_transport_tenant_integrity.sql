@@ -52,5 +52,3 @@ CREATE INDEX transport_vehicles_school_idx ON transport_vehicles(school_id);
 CREATE INDEX transport_routes_school_idx ON transport_routes(school_id);
 CREATE INDEX transport_stops_school_idx ON transport_stops(school_id);
 CREATE INDEX transport_allocations_school_idx ON transport_allocations(school_id);
-
-COMMIT;
