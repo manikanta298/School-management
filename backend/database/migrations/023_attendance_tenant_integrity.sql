@@ -37,3 +37,17 @@ CREATE INDEX attendance_entries_school_student_date_idx
   ON attendance_entries(school_id, student_id, attendance_date);
 CREATE INDEX attendance_audit_school_entry_idx
   ON attendance_audit(school_id, entry_id, id);
+
+
+-- Keep audit rows in the same tenant as the attendance entry that generated them.
+CREATE OR REPLACE FUNCTION audit_attendance_change() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP='INSERT' THEN
+  INSERT INTO attendance_audit(school_id,entry_id,new_status,new_note,changed_by)
+  VALUES(NEW.school_id,NEW.id,NEW.status,NEW.note,NEW.updated_by);
+ ELSIF (NEW.status,NEW.note) IS DISTINCT FROM (OLD.status,OLD.note) THEN
+  INSERT INTO attendance_audit(school_id,entry_id,previous_status,previous_note,new_status,new_note,reason,changed_by)
+  VALUES(NEW.school_id,NEW.id,OLD.status,OLD.note,NEW.status,NEW.note,NEW.change_reason,NEW.updated_by);
+ END IF;
+ RETURN NEW;
+END; $$;
