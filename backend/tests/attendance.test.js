@@ -154,9 +154,10 @@ test('attendance registers and records are isolated across schools',async()=>{
  const sectionB=await insert('INSERT INTO sections(school_id,name,class_id,capacity) VALUES($1,$2,$3,40) RETURNING id',[schoolB,'B Section',classB]);
  const studentIdB=await insert('INSERT INTO students(school_id,user_id,admission_number,admission_date) VALUES($1,$2,$3,$4) RETURNING id',[schoolB,studentB.id,'B-ADM-1','2025-01-01']);
  await query('INSERT INTO enrollments(school_id,student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,$5,$6)',[schoolB,studentIdB,yearB,classB,sectionB,'2025-06-01']);
+ const schoolABefore=(await query('SELECT count(*)::int AS count FROM attendance_entries WHERE school_id=$1',[schoolA])).rows[0].count;
  const payload={section_id:sectionB,date:'2025-09-01',expected_version:0,entries:[{student_id:studentIdB,status:'present'}]};
  r=await callB('put','attendance/register',payload);assert.equal(r.status,200,JSON.stringify(r.body));
  r=await callB('get',`attendance/register?section_id=${sectionB}&date=2025-09-01`);assert.equal(r.status,200);assert.equal(r.body.items.length,1);assert.equal(r.body.items[0].student_id,studentIdB);
  assert.equal((await query('SELECT count(*)::int AS count FROM attendance_entries WHERE school_id=$1',[schoolB])).rows[0].count,1);
- assert.equal((await query('SELECT count(*)::int AS count FROM attendance_entries WHERE school_id=$1',[schoolA])).rows[0].count,0);
+ assert.equal((await query('SELECT count(*)::int AS count FROM attendance_entries WHERE school_id=$1',[schoolA])).rows[0].count,schoolABefore);
 });
