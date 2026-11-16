@@ -11,7 +11,7 @@ const hash=await hashPassword('NoticesPassword!123'),accounts={},tokens={},ids={
 for(const [key,role] of [['admin','admin'],['t1','teacher'],['t2','teacher'],['t3','teacher'],['s1','student'],['s2','student'],['s3','student'],['parent','parent'],['otherParent','parent'],['outsider','parent']]){
  accounts[key]=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key.toLowerCase()}@example.com`,hash,role]);await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolId,accounts[key],role]);const r=await request(app).post('/api/auth/login').send({email:`${key.toLowerCase()}@example.com`,password:'NoticesPassword!123'});assert.equal(r.status,200);tokens[key]=r.body.accessToken;
 }
-ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current) VALUES('Current year',CURRENT_DATE-30,CURRENT_DATE+330,true) RETURNING id");
+ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current,school_id) VALUES('Current year',CURRENT_DATE-30,CURRENT_DATE+330,true,$1) RETURNING id",[schoolId]);
 for(const key of ['c1','c2'])ids[key]=await insert('INSERT INTO classes(name,academic_year_id) VALUES($1,$2) RETURNING id',[key,ids.year]);
 for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('INSERT INTO sections(name,class_id,capacity) VALUES($1,$2,40) RETURNING id',[key,ids[cl]]);
 for(const key of ['math','science'])ids[key]=await insert('INSERT INTO subjects(name,code) VALUES($1,$2) RETURNING id',[key,key.toUpperCase()]);
@@ -25,7 +25,7 @@ for(const [key,sec,cl] of [['s1','a','c1'],['s2','b','c1'],['s3','c','c2']]){
  ids[key+'enrollment']=await insert('INSERT INTO enrollments(student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,CURRENT_DATE-30) RETURNING id',[ids[key],ids.year,ids[cl],ids[sec]]);
 }
 for(const key of ['parent','otherParent','outsider'])ids[key]=await insert('INSERT INTO parents(user_id) VALUES($1) RETURNING id',[accounts[key]]);
-await query("INSERT INTO student_parents(student_id,parent_id,relationship) VALUES($1,$2,'guardian'),($3,$4,'guardian')",[ids.s1,ids.parent,ids.s3,ids.otherParent]);
+await query("INSERT INTO student_parents(student_id,parent_id,relationship,school_id) VALUES($1,$2,'guardian',$5),($3,$4,'guardian',$5)",[ids.s1,ids.parent,ids.s3,ids.otherParent,schoolId]);
 for(const [student,sec,cl,status] of [['s1','a','c1','present'],['s3','c','c2','absent']]){
  const rid=await insert('INSERT INTO attendance_registers(section_id,class_id,academic_year_id,attendance_date,created_by) VALUES($1,$2,$3,CURRENT_DATE,$4) RETURNING id',[ids[sec],ids[cl],ids.year,accounts.admin]);
  await query('INSERT INTO attendance_entries(register_id,attendance_date,student_id,enrollment_id,status,updated_by) VALUES($1,CURRENT_DATE,$2,$3,$4,$5)',[rid,ids[student],ids[student+'enrollment'],status,accounts.admin]);
