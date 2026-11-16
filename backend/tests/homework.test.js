@@ -19,7 +19,7 @@ const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api
 const day=offset=>{const d=new Date();d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);};
 ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current,school_id) VALUES('Current',CURRENT_DATE-60,CURRENT_DATE+300,true,$1) RETURNING id",[schoolId]);
 for(const key of ['c1','c2'])ids[key]=await insert('INSERT INTO classes(name,academic_year_id,school_id) VALUES($1,$2,$3) RETURNING id',[key,ids.year,schoolId]);
-for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('INSERT INTO sections(name,class_id,capacity) VALUES($1,$2,40) RETURNING id',[key,ids[cl]]);
+for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('INSERT INTO sections(name,class_id,capacity,school_id) VALUES($1,$2,40,$3) RETURNING id',[key,ids[cl],schoolId]);
 for(const key of ['mathSubject','scienceSubject'])ids[key]=await insert('INSERT INTO subjects(name,code,school_id) VALUES($1,$2,$3) RETURNING id',[key,key.toUpperCase(),schoolId]);
 for(const [key,kind,cl,subject] of [['math','subject_teacher','c1','mathSubject'],['science','subject_teacher','c2','scienceSubject'],['classTeacher','class_teacher','c1',null]]){
  ids[key]=await insert("INSERT INTO teachers(user_id,employee_number,joining_date) VALUES($1,$2,CURRENT_DATE-365) RETURNING id",[accounts[key],key.toUpperCase()]);
