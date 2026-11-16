@@ -9,6 +9,7 @@ await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const hash=await hashPassword('HomeworkPassword!123'),accounts={},tokens={},ids={},schoolId=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
+for(const {table_name} of (await query("SELECT table_name FROM information_schema.columns WHERE table_schema='public' AND column_name='school_id' AND table_name NOT IN ('school_memberships')")).rows)await query(`ALTER TABLE ${table_name} ALTER COLUMN school_id SET DEFAULT '${schoolId}'`);
 const insert=async(sql,params)=>(await query(sql,params)).rows[0].id;
 for(const [key,role] of [['admin','admin'],['math','teacher'],['science','teacher'],['classTeacher','teacher'],['s1','student'],['s2','student'],['s3','student'],['parent','parent'],['outsider','parent']]){
  accounts[key]=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key.toLowerCase()}@example.com`,hash,role]);
@@ -23,7 +24,7 @@ for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('
 for(const key of ['mathSubject','scienceSubject'])ids[key]=await insert('INSERT INTO subjects(name,code,school_id) VALUES($1,$2,$3) RETURNING id',[key,key.toUpperCase(),schoolId]);
 for(const [key,kind,cl,subject] of [['math','subject_teacher','c1','mathSubject'],['science','subject_teacher','c2','scienceSubject'],['classTeacher','class_teacher','c1',null]]){
  ids[key]=await insert("INSERT INTO teachers(user_id,employee_number,joining_date,school_id) VALUES($1,$2,CURRENT_DATE-365,$3) RETURNING id",[accounts[key],key.toUpperCase(),schoolId]);
- await query('INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind,subject_id) VALUES($1,$2,$3,$4,$5)',[ids[key],ids[cl],ids.year,kind,subject?ids[subject]:null]);
+ await query('INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind,subject_id,school_id) VALUES($1,$2,$3,$4,$5,$6)',[ids[key],ids[cl],ids.year,kind,subject?ids[subject]:null,schoolId]);
 }
 for(const [key,sec,cl] of [['s1','a','c1'],['s2','b','c1'],['s3','c','c2']]){
  ids[key]=await insert('INSERT INTO students(user_id,admission_number,admission_date) VALUES($1,$2,CURRENT_DATE-90) RETURNING id',[accounts[key],key.toUpperCase()]);

@@ -8,6 +8,7 @@ const {pool}=await import('../src/config/db.js');const db=new PGlite();await db.
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const hash=await hashPassword('NoticesPassword!123'),accounts={},tokens={},ids={},schoolId=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;const insert=async(sql,params)=>(await query(sql,params)).rows[0].id;
+for(const {table_name} of (await query("SELECT table_name FROM information_schema.columns WHERE table_schema='public' AND column_name='school_id' AND table_name NOT IN ('school_memberships')")).rows)await query(`ALTER TABLE ${table_name} ALTER COLUMN school_id SET DEFAULT '${schoolId}'`);
 for(const [key,role] of [['admin','admin'],['t1','teacher'],['t2','teacher'],['t3','teacher'],['s1','student'],['s2','student'],['s3','student'],['parent','parent'],['otherParent','parent'],['outsider','parent']]){
  accounts[key]=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key.toLowerCase()}@example.com`,hash,role]);await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolId,accounts[key],role]);const r=await request(app).post('/api/auth/login').send({email:`${key.toLowerCase()}@example.com`,password:'NoticesPassword!123'});assert.equal(r.status,200);tokens[key]=r.body.accessToken;
 }
@@ -17,7 +18,7 @@ for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('
 for(const key of ['math','science'])ids[key]=await insert('INSERT INTO subjects(name,code,school_id) VALUES($1,$2,$3) RETURNING id',[key,key.toUpperCase(),schoolId]);
 for(const [key,cl,sub] of [['t1','c1','math'],['t2','c2','science']]){
  ids[key]=await insert('INSERT INTO teachers(user_id,employee_number,joining_date,school_id) VALUES($1,$2,CURRENT_DATE-365,$3) RETURNING id',[accounts[key],key.toUpperCase(),schoolId]);
- ids[key+'assignment']=await insert("INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind,subject_id) VALUES($1,$2,$3,'subject_teacher',$4) RETURNING id",[ids[key],ids[cl],ids.year,ids[sub]]);
+ ids[key+'assignment']=await insert("INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind,subject_id,school_id) VALUES($1,$2,$3,'subject_teacher',$4,$5) RETURNING id",[ids[key],ids[cl],ids.year,ids[sub],schoolId]);
  await query('INSERT INTO timetable_slots(section_id,class_id,academic_year_id,assignment_id,teacher_id,subject_id,weekday,start_minute,end_minute,effective_from,effective_to,created_by,changed_by) VALUES($1,$2,$3,$4,$5,$6,extract(isodow FROM CURRENT_DATE)::int,540,600,CURRENT_DATE-30,CURRENT_DATE+330,$7,$7)',[key==='t1'?ids.a:ids.c,ids[cl],ids.year,ids[key+'assignment'],ids[key],ids[sub],accounts.admin]);
 }
 for(const [key,sec,cl] of [['s1','a','c1'],['s2','b','c1'],['s3','c','c2']]){
