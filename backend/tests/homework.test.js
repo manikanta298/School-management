@@ -8,10 +8,11 @@ const {pool}=await import('../src/config/db.js');const db=new PGlite();
 await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
-const hash=await hashPassword('HomeworkPassword!123'),accounts={},tokens={},ids={};
+const hash=await hashPassword('HomeworkPassword!123'),accounts={},tokens={},ids={},schoolId=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
 const insert=async(sql,params)=>(await query(sql,params)).rows[0].id;
 for(const [key,role] of [['admin','admin'],['math','teacher'],['science','teacher'],['classTeacher','teacher'],['s1','student'],['s2','student'],['s3','student'],['parent','parent'],['outsider','parent']]){
  accounts[key]=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key.toLowerCase()}@example.com`,hash,role]);
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolId,accounts[key],role]);
  const login=await request(app).post('/api/auth/login').send({email:`${key.toLowerCase()}@example.com`,password:'HomeworkPassword!123'});assert.equal(login.status,200);tokens[key]=login.body.accessToken;
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
@@ -29,7 +30,7 @@ for(const [key,sec,cl] of [['s1','a','c1'],['s2','b','c1'],['s3','c','c2']]){
  await query('INSERT INTO enrollments(student_id,academic_year_id,class_id,section_id,enrolled_on) VALUES($1,$2,$3,$4,CURRENT_DATE-30)',[ids[key],ids.year,ids[cl],ids[sec]]);
 }
 ids.parent=await insert('INSERT INTO parents(user_id) VALUES($1) RETURNING id',[accounts.parent]);await insert('INSERT INTO parents(user_id) VALUES($1) RETURNING id',[accounts.outsider]);
-await query("INSERT INTO student_parents(student_id,parent_id,relationship) VALUES($1,$2,'guardian')",[ids.s1,ids.parent]);
+await query("INSERT INTO student_parents(student_id,parent_id,relationship,school_id) VALUES($1,$2,'guardian',$3)",[ids.s1,ids.parent,schoolId]);
 after(async()=>{await db.close();await pool.end();});
 const post=(extra={},who='math')=>call('post','homework',{section_id:ids.a,subject_id:ids.mathSubject,title:'Fractions',details:'Complete exercise 4.',due_on:day(3),...extra},who);
 test('only assigned subject teachers or admins can post, with strict validation',async()=>{

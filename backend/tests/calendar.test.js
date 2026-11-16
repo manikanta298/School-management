@@ -6,11 +6,12 @@ import request from 'supertest';
 process.env.NODE_ENV='test';process.env.JWT_SECRET='calendar-test-secret'.repeat(4);process.env.DATABASE_URL='postgres://test:test@localhost/test';process.env.FRONTEND_ORIGIN='http://localhost:5173';
 const {pool}=await import('../src/config/db.js');const db=new PGlite();
 await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
-const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
+const query=async(text,params)=>{const r=params?await db.query(text,params):(await db.exec(text)).at(-1);return {...r,rowCount:r.rows?.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
-const hash=await hashPassword('CalendarPassword!123'),tokens={};
+const hash=await hashPassword('CalendarPassword!123'),tokens={},schoolId=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
 for(const role of ['admin','teacher','student','parent']){
- await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)',[role,`${role}@example.com`,hash,role]);
+ const userId=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[role,`${role}@example.com`,hash,role])).rows[0].id;
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolId,userId,role]);
  const login=await request(app).post('/api/auth/login').send({email:`${role}@example.com`,password:'CalendarPassword!123'});assert.equal(login.status,200);tokens[role]=login.body.accessToken;
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
