@@ -13,7 +13,7 @@ for(const [key,role] of [['admin','admin'],['t1','teacher'],['t2','teacher'],['t
 }
 for(const [key,start,end] of [['y1','2025-06-01','2026-05-31'],['y2','2025-09-01','2026-08-31']])ids[key]=await insert('INSERT INTO academic_years(name,start_date,end_date,school_id) VALUES($1,$2,$3,$4) RETURNING id',[key,start,end,schoolId]);
 for(const [key,y] of [['c1','y1'],['c2','y1'],['c3','y2']])ids[key]=await insert('INSERT INTO classes(name,academic_year_id,school_id) VALUES($1,$2,$3) RETURNING id',[key,ids[y],schoolId]);
-for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2'],['d','c3']])ids[key]=await insert('INSERT INTO sections(name,class_id,capacity) VALUES($1,$2,40) RETURNING id',[key,ids[cl]]);
+for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2'],['d','c3']])ids[key]=await insert('INSERT INTO sections(name,class_id,capacity,school_id) VALUES($1,$2,40,$3) RETURNING id',[key,ids[cl],schoolId]);
 for(const key of ['math','science','art'])ids[key]=await insert('INSERT INTO subjects(name,code,school_id) VALUES($1,$2,$3) RETURNING id',[key,key.toUpperCase(),schoolId]);
 for(const key of ['t1','t2','t3'])ids[key]=await insert('INSERT INTO teachers(user_id,employee_number,joining_date) VALUES($1,$2,$3) RETURNING id',[accounts[key],key.toUpperCase(),key==='t3'?'2025-10-01':'2020-01-01']);
 for(const [key,t,cl,y,sub] of [['a1','t1','c1','y1','math'],['a2','t2','c1','y1','science'],['a3','t1','c3','y2','math'],['a4','t2','c2','y1','science'],['a5','t3','c2','y1','art'],['advisor','t3','c1','y1',null]])ids[key]=await insert('INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind,subject_id) VALUES($1,$2,$3,$4,$5) RETURNING id',[ids[t],ids[cl],ids[y],sub?'subject_teacher':'class_teacher',sub?ids[sub]:null]);
