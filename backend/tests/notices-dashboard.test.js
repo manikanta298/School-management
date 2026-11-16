@@ -136,3 +136,20 @@ test('notice paging, literal search and validation do not expand scope',async()=
  r=await call('get','notices?q=%27%20OR%201%3D1--',undefined,'s2');assert.deepEqual(r.body.items,[]);
  for(const path of ['notices?limit=101','notices/not-a-uuid',`notices/${ids.global}/readers?content_revision=999999999999`]){r=await call('get',path);assert.equal(r.status,400);}
 });
+
+test('dashboard and notices never include another school',async()=>{
+ const {rows:[sb]}=await query("INSERT INTO schools(name,slug) VALUES('School B','school-b-dash') RETURNING id");
+ const adminB=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',['adminB','adminb@example.com',hash,'admin']);
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'admin','active',true)",[sb.id,adminB]);
+ const login=await request(app).post('/api/auth/login').send({email:'adminb@example.com',password:'NoticesPassword!123'});assert.equal(login.status,200);tokens.adminB=login.body.accessToken;
+ const r=await call('get','dashboard',undefined,'adminB');assert.equal(r.status,200,JSON.stringify(r.body));
+ const b=r.body,n=x=>Number(x||0);
+ assert.equal(b.current_year,null);
+ assert.deepEqual(b.stats.active_accounts,{admin:1});
+ assert.deepEqual([n(b.stats.profiles.students),n(b.stats.profiles.parents),n(b.stats.profiles.active_teachers)],[0,0,0]);
+ assert.equal(n(b.stats.academic.classes),0);
+ assert.equal(b.insights.class_strength.length,0);assert.equal(b.insights.recent_admissions.length,0);assert.equal(b.insights.upcoming_exams.length,0);assert.equal(n(b.insights.new_admissions),0);
+ assert.equal(n(b.stats.notice_management.draft)+n(b.stats.notice_management.scheduled),0);
+ assert.equal(b.notices.items.length,0);assert.equal(n(b.notices.unread_count),0);
+ const list=await call('get','notices',undefined,'adminB');assert.equal(list.status,200);assert.equal(list.body.items.length,0);
+});
