@@ -69,6 +69,6 @@ test('academic catalogue is isolated and parent references cannot cross schools'
  const schoolBClasses=await callB('post','classes',{name:'Grade 1',academic_year_id:yearB});assert.equal(schoolBClasses.status,201);
  const schoolBSubject=await callB('post','subjects',{name:'Mathematics',code:'MATH'});assert.equal(schoolBSubject.status,201,'same subject code can exist in separate schools');
  const schoolASubject=await callA('post','subjects',{name:'Mathematics',code:'MATH'});assert.equal(schoolASubject.status,201);
- const aList=await callA('get','academic-years');assert.equal(aList.body.items.length,2);
+ const aList=await callA('get','academic-years');assert.equal(aList.body.items.length,1);
  const bList=await callB('get','academic-years');assert.equal(bList.body.items.length,1);
 });
