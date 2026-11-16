@@ -17,7 +17,7 @@ for(const [key,role] of [['admin','admin'],['math','teacher'],['science','teache
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
 const day=offset=>{const d=new Date();d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);};
-ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current) VALUES('Current',CURRENT_DATE-60,CURRENT_DATE+300,true) RETURNING id");
+ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current,school_id) VALUES('Current',CURRENT_DATE-60,CURRENT_DATE+300,true,$1) RETURNING id",[schoolId]);
 for(const key of ['c1','c2'])ids[key]=await insert('INSERT INTO classes(name,academic_year_id) VALUES($1,$2) RETURNING id',[key,ids.year]);
 for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('INSERT INTO sections(name,class_id,capacity) VALUES($1,$2,40) RETURNING id',[key,ids[cl]]);
 for(const key of ['mathSubject','scienceSubject'])ids[key]=await insert('INSERT INTO subjects(name,code) VALUES($1,$2) RETURNING id',[key,key.toUpperCase()]);
