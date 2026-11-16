@@ -8,14 +8,16 @@ const {pool}=await import('../src/config/db.js');const db=new PGlite();
 await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
-const hash=await hashPassword('ExchangePassword!123'),tokens={};
+const hash=await hashPassword('ExchangePassword!123'),tokens={},schoolId=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id,accountIds={};
 for(const role of ['admin','teacher','student','parent']){
- await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)',[role,`${role}@example.com`,hash,role]);
+ const userId=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[role,`${role}@example.com`,hash,role])).rows[0].id;accountIds[role]=userId;
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolId,userId,role]);
  const login=await request(app).post('/api/auth/login').send({email:`${role}@example.com`,password:'ExchangePassword!123'});assert.equal(login.status,200);tokens[role]=login.body.accessToken;
 }
 for(const n of [1,2]){
- await query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'student')",[`Pupil ${n}`,`pupil${n}@example.com`,hash]);
- await query("INSERT INTO students(user_id,admission_number,admission_date,date_of_birth,city) SELECT id,$2,'2025-01-01','2015-05-05','Old city' FROM users WHERE email=$1",[`pupil${n}@example.com`,`ADM${n}`]);
+ const userId=(await query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'student') RETURNING id",[`Pupil ${n}`,`pupil${n}@example.com`,hash])).rows[0].id;
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'student','active',true)",[schoolId,userId]);
+ await query("INSERT INTO students(school_id,user_id,admission_number,admission_date,date_of_birth,city) VALUES($1,$2,$3,'2025-01-01','2015-05-05','Old city')",[schoolId,userId,`ADM${n}`]);
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
 const student=async n=>(await query('SELECT * FROM students WHERE admission_number=$1',[`ADM${n}`])).rows[0];
