@@ -14,7 +14,7 @@ const editable=async(user,id)=>{await visible(user,id);const row=await model.raw
 homeworkRouter.get('/',async(req,res)=>{const q=v.listQuery.safeParse(req.query);if(!q.success)return res.status(400).json({message:'Invalid query'});res.json({items:await model.list(req.user,q.data)});});
 homeworkRouter.get('/:id',async(req,res)=>res.json({item:await visible(req.user,req.params.id)}));
 homeworkRouter.post('/',staff,validate(v.create),async(req,res)=>{
- if(!await model.sectionExists(req.body.section_id))throw fail(404,'Section not found');
+ if(!await model.sectionExists(req.user,req.body.section_id))throw fail(404,'Section not found');
  if(!await model.mayTeach(req.user,req.body.section_id,req.body.subject_id))throw fail(403,'You are not assigned to teach this subject in this class');
  const saved=await model.create(req.user,req.body);res.status(201).json({item:await visible(req.user,saved.id)});
 });

@@ -10,7 +10,7 @@ export async function authenticate(req,res,next) {
    [payload.sub,payload.sid]
   );
   if(!u || (payload.schoolId && payload.schoolId!==u.active_school_id)) return res.status(401).json({message:'Authentication required'});
-  req.user={id:u.id,name:u.name,email:u.email,role:u.role,active:u.active};
+  req.user={id:u.id,name:u.name,email:u.email,role:u.role,active:u.active,schoolId:u.active_school_id};
   req.schoolId=u.active_school_id;req.sessionId=payload.sid;next();
  }catch(e){if(e.name?.includes('Token') || e.name==='JsonWebTokenError') return res.status(401).json({message:'Authentication required'});next(e);}
 }
