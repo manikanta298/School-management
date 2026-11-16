@@ -21,7 +21,7 @@ const day=offset=>{const d=new Date();d.setUTCDate(d.getUTCDate()+offset);return
 ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current,school_id) VALUES('Current',CURRENT_DATE-60,CURRENT_DATE+300,true,$1) RETURNING id",[schoolId]);
 for(const key of ['s1','s2','s3'])ids[key]=await insert('INSERT INTO students(user_id,admission_number,admission_date,school_id) VALUES($1,$2,CURRENT_DATE-90,$3) RETURNING id',[accounts[key],key.toUpperCase(),schoolId]);
 ids.parent=await insert('INSERT INTO parents(user_id,school_id) VALUES($1,$2) RETURNING id',[accounts.parent,schoolId]);await insert('INSERT INTO parents(user_id,school_id) VALUES($1,$2) RETURNING id',[accounts.outsider,schoolId]);
-await query("INSERT INTO student_parents(student_id,parent_id,relationship) VALUES($1,$2,'guardian')",[ids.s1,ids.parent]);
+await query("INSERT INTO student_parents(student_id,parent_id,relationship,school_id) VALUES($1,$2,'guardian',$3)",[ids.s1,ids.parent,schoolId]);
 after(async()=>{await db.close();await pool.end();});
 const vehicle=(extra={})=>({registration_number:'ts 09 ab 1234',capacity:2,driver_name:'Ravi',driver_phone:'+91 98765 43210',insurance_expiry:day(100),permit_expiry:day(100),...extra});
 test('only admins manage vehicles; expiry alerts and validation work',async()=>{
