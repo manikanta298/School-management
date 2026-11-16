@@ -49,7 +49,12 @@ export async function addLink(schoolId,studentId,data){return (await pool.query(
 export async function removeLink(schoolId,studentId,parentId){return (await pool.query('DELETE FROM student_parents WHERE school_id=$1 AND student_id=$2 AND parent_id=$3 RETURNING parent_id',[schoolId,studentId,parentId])).rows[0];}
 export async function enrollments(schoolId,studentId,query){return (await pool.query(`SELECT e.id,e.student_id,e.academic_year_id,e.class_id,e.section_id,e.enrolled_on,e.status,y.name AS academic_year_name,c.name AS class_name,s.name AS section_name FROM enrollments e JOIN academic_years y ON y.id=e.academic_year_id AND y.school_id=e.school_id JOIN classes c ON c.id=e.class_id AND c.school_id=e.school_id JOIN sections s ON s.id=e.section_id AND s.school_id=e.school_id WHERE e.school_id=$1 AND e.student_id=$2 ORDER BY y.start_date DESC,e.id LIMIT $3 OFFSET $4`,[schoolId,studentId,query.limit,query.offset])).rows;}
 export async function saveEnrollment(schoolId,studentId,id,data){
- const {rows:[section]}=await pool.query('SELECT class_id FROM sections WHERE school_id=$1 AND id=$2',[schoolId,data.section_id]);if(!section)return null;
+ const {rows:[section]}=await pool.query('SELECT s.class_id,s.school_id,c.academic_year_id AS class_year_id FROM sections s JOIN classes c ON c.id=s.class_id AND c.school_id=s.school_id WHERE s.id=$1',[data.section_id]);
+ if(!section)return null;
+ if(section.school_id!==schoolId)return {__conflict:true};
+ const {rows:[year]}=await pool.query('SELECT school_id FROM academic_years WHERE id=$1',[data.academic_year_id]);
+ if(!year)return null;
+ if(year.school_id!==schoolId||section.class_year_id!==data.academic_year_id)return {__conflict:true};
  const values=[schoolId,studentId,data.academic_year_id,section.class_id,data.section_id,data.enrolled_on,data.status];
  if(id){values.push(id);return (await pool.query('UPDATE enrollments SET academic_year_id=$3,class_id=$4,section_id=$5,enrolled_on=$6,status=$7,updated_at=now() WHERE school_id=$1 AND student_id=$2 AND id=$8 RETURNING *',values)).rows[0];}
  return (await pool.query('INSERT INTO enrollments(school_id,student_id,academic_year_id,class_id,section_id,enrolled_on,status) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',values)).rows[0];
