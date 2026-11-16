@@ -52,6 +52,8 @@ test('academic CRUD, role access, constraints, filters and pagination',async()=>
 });
 
 test('academic catalogue is isolated and parent references cannot cross schools',async()=>{
+ const adminLogin=await request(app).post('/api/auth/login').send({email:'admin@example.com',password});assert.equal(adminLogin.status,200);const adminToken=adminLogin.body.accessToken;
+ const callA=(method,path,body)=>{const req=request(app)[method]('/api/academic/'+path).set('Authorization',`Bearer ${adminToken}`);return body?req.send(body):req;};
  const schoolB=(await query("INSERT INTO schools(name,slug) VALUES('Second School','second-school') RETURNING id")).rows[0].id;
  const userB=(await query("INSERT INTO users(name,email,password_hash,role) VALUES('Second Admin','second-admin@example.com',$1,'admin') RETURNING id",[hash])).rows[0].id;
  await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'admin','active',true)",[schoolB,userB]);
@@ -60,13 +62,13 @@ test('academic catalogue is isolated and parent references cannot cross schools'
  let r=await callB('get','academic-years');assert.equal(r.status,200);assert.equal(r.body.items.length,0);
  r=await callB('post','academic-years',{name:'2026–2027',start_date:'2026-06-01',end_date:'2027-05-31',is_current:true});assert.equal(r.status,201);const yearB=r.body.item.id;
  r=await callB('post','classes',{name:'Grade 1',academic_year_id:'00000000-0000-4000-8000-000000000000'});assert.equal(r.status,409);
- const schoolAYear=await call('post','academic-years',{name:'2026–2027',start_date:'2026-06-01',end_date:'2027-05-31',is_current:true});assert.equal(schoolAYear.status,201);const yearA=schoolAYear.body.item.id;
+ const schoolAYear=await callA('post','academic-years',{name:'2026–2027',start_date:'2026-06-01',end_date:'2027-05-31',is_current:true});assert.equal(schoolAYear.status,201);const yearA=schoolAYear.body.item.id;
  r=await callB('post','classes',{name:'Hijack',academic_year_id:yearA});assert.equal(r.status,409,'school B cannot reference school A academic year');
  r=await callB('get',`academic-years/${yearA}`);assert.equal(r.status,404);
  r=await callB('put',`academic-years/${yearA}`,{name:'Changed',start_date:'2026-06-01',end_date:'2027-05-31',is_current:false});assert.equal(r.status,404);
  const schoolBClasses=await callB('post','classes',{name:'Grade 1',academic_year_id:yearB});assert.equal(schoolBClasses.status,201);
  const schoolBSubject=await callB('post','subjects',{name:'Mathematics',code:'MATH'});assert.equal(schoolBSubject.status,201,'same subject code can exist in separate schools');
  const schoolASubject=await call('post','subjects',{name:'Mathematics',code:'MATH'});assert.equal(schoolASubject.status,201);
- const aList=await call('get','academic-years');assert.equal(aList.body.items.length,2);
+ const aList=await callA('get','academic-years');assert.equal(aList.body.items.length,2);
  const bList=await callB('get','academic-years');assert.equal(bList.body.items.length,1);
 });
