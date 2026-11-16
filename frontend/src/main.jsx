@@ -18,10 +18,13 @@ import Notices from './pages/Notices';
 import Dashboard from './pages/Dashboard';
 function App(){
  const [user,setUser]=useState(null),[loading,setLoading]=useState(true),[page,setPage]=useState('dashboard'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[users,setUsers]=useState([]),[offset,setOffset]=useState(0),[focusedNotice,setFocusedNotice]=useState(null);
- useEffect(()=>{restore().then(d=>setUser(d.user)).catch(()=>{}).finally(()=>setLoading(false));},[]);
+ const [schools,setSchools]=useState([]),[activeSchoolId,setActiveSchoolId]=useState(null);
+ async function loadSchools(){try{const d=await api('/auth/schools');setSchools(d.items);setActiveSchoolId(d.activeSchoolId);}catch{}}
+ useEffect(()=>{restore().then(d=>{setUser(d.user);loadSchools();}).catch(()=>{}).finally(()=>setLoading(false));},[]);
  async function loadUsers(start=0){const d=await api(`/users?limit=25&offset=${start}`);setUsers(d.users);setOffset(start);}
  async function run(fn){setError('');setNotice('');setBusy(true);try{await fn();}catch(e){setError(e.message);}finally{setBusy(false);}}
- async function login(e){e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));await run(async()=>{const d=await api('/auth/login',{method:'POST',body});setUser(d.user);setPage('dashboard');});}
+ async function login(e){e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));await run(async()=>{const d=await api('/auth/login',{method:'POST',body});setUser(d.user);loadSchools();setPage('dashboard');});}
+ async function switchSchool(id){await run(async()=>{const d=await api('/auth/switch-school',{method:'POST',body:{school_id:id}});setUser(d.user);setActiveSchoolId(d.activeSchoolId);setUsers([]);setPage('dashboard');await loadSchools();});}
  async function logout(){await run(async()=>{await api('/auth/logout',{method:'POST'});clearToken();setUser(null);setUsers([]);});}
  async function change(e){e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));await run(async()=>{await api('/auth/change-password',{method:'POST',body});clearToken();setUser(null);setNotice('Password changed. Sign in again.');});}
  async function create(e){e.preventDefault();const form=e.currentTarget,body=Object.fromEntries(new FormData(form));await run(async()=>{await api('/users',{method:'POST',body});form.reset();await loadUsers();setNotice('Account created. Share credentials securely.');});}
@@ -29,7 +32,7 @@ function App(){
  const field=(name,label,type='text',minLength)=> <label>{label}<input name={name} type={type} required minLength={minLength} autoComplete={type==='password'?'new-password':undefined}/></label>;
  if(loading)return <main><p role="status">Loading your session…</p></main>;
  function navigate(target){setPage(target);if(target==='notices')setFocusedNotice(null);if(target==='users')run(async()=>{await loadUsers();});}
- return <AppShell user={user} page={page} onNavigate={navigate} onLogout={logout} busy={busy}>
+ return <AppShell key={activeSchoolId} user={user} page={page} onNavigate={navigate} onLogout={logout} busy={busy} schools={schools} activeSchoolId={activeSchoolId} onSwitchSchool={switchSchool}>
  {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status" className="notice">{notice}</p>}
  {!user?<section className="login"><p className="eyebrow">SCHOOL PORTAL</p><h1>Welcome back</h1><p>Sign in with your school account.</p><form onSubmit={login}>{field('email','Email','email')}<label>Password<input name="password" type="password" required autoComplete="current-password"/></label><button disabled={busy}>{busy?'Signing in…':'Sign in'}</button></form><p>Need an account or password reset? Contact your school administrator.</p></section>:<>
  {page==='notices'&&<Notices user={user} initialId={focusedNotice}/>}

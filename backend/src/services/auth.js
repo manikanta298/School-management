@@ -20,6 +20,12 @@ export async function issue(user,client=pool,requestedSchoolId=null) {
  const sessionUser={...user,role:membership.role};
  return {refresh,schoolId:membership.school_id,accessToken:jwt.sign({sid,schoolId:membership.school_id},env.JWT_SECRET,{subject:user.id,expiresIn:'15m',algorithm:'HS256',issuer:'school-api',audience:'school-web'}),user:publicUser(sessionUser)};
 }
+export async function schoolsFor(userId){return (await pool.query("SELECT s.id,s.name,s.slug,m.role,m.is_default FROM school_memberships m JOIN schools s ON s.id=m.school_id AND s.status='active' WHERE m.user_id=$1 AND m.status='active' ORDER BY m.is_default DESC,s.name",[userId])).rows;}
+export async function switchSchool(user,sessionId,schoolId){
+ const c=await pool.connect();
+ try {await c.query('BEGIN');const result=await issue(user,c,schoolId);await c.query('UPDATE auth_sessions SET revoked_at=now() WHERE id=$1 AND user_id=$2',[sessionId,user.id]);await c.query('COMMIT');return result;}
+ catch(e) {await c.query('ROLLBACK');throw e;} finally {c.release();}
+}
 export async function rotate(token) {
  if(!token || !/^[a-f0-9]{96}$/.test(token)) throw fail(401,'Session expired');
  const c=await pool.connect();
