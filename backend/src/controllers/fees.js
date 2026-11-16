@@ -12,3 +12,4 @@ export const summary=async(req,res)=>res.json({items:await service.summary(req.u
 export const events=async(req,res)=>res.json({items:await service.events(req.user,req.schoolId,req.params.id,req.feeQuery)});
 
 export const calendar=async(_req,res)=>res.json(await service.calendar());
+export const receipt=async(req,res)=>res.json({item:await service.receipt(req.user,req.schoolId,req.params.id,req.params.paymentId)});

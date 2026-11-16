@@ -22,3 +22,8 @@ export async function reverse(user,schoolId,invoiceId,paymentId,reason){return t
 export async function voidInvoice(user,schoolId,id,reason){return transaction(async c=>{await adminActor(c,user,schoolId);await find(user,schoolId,id,c);await c.query('SELECT id FROM fee_invoices WHERE id=$1 AND school_id=$2 FOR UPDATE',[id,schoolId]);const result=await c.query('UPDATE fee_invoices SET voided_at=now(),void_reason=$1,voided_by=$2 WHERE id=$3 AND school_id=$4 AND voided_at IS NULL RETURNING id',[reason,user.id,id,schoolId]);if(!result.rows[0])throw fail(409,'Invoice already void');});}
 
 export async function calendar(){return (await pool.query('SELECT CURRENT_DATE::text AS today')).rows[0];}
+export async function receipt(user,schoolId,id,paymentId){
+ const row=await model.receipt(user,schoolId,id,paymentId);if(!row)throw fail(404,'Receipt not found');
+ const {paid_to_date_minor:paid,...rest}=row;
+ return {...rest,paid_to_date_minor:Number(paid),balance_after_minor:row.invoice_amount_minor-Number(paid)};
+}

@@ -11,3 +11,5 @@
 }
 
 .school-switch{display:grid;gap:4px;margin:0 12px 10px}.school-switch select{width:100%}
+
+@media print{.no-print{display:none!important}}
