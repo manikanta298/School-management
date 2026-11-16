@@ -8,9 +8,19 @@ export async function seedDemo(actor){
  const tenantTables=new Set(['academic_years','terms','classes','sections','subjects','teachers','teacher_assignments','students','parents','student_parents','enrollments','attendance_registers','attendance_entries','attendance_audit','fee_structures','fee_invoices','fee_payments','fee_events','exam_grading_scales','exam_grade_bands','exams','exam_candidates','exam_papers','exam_marks','exam_mark_audit','exam_events','school_rooms','timetable_slots','timetable_audit','notices','notice_reads','notice_audit','student_status_history','staff_members','homework','homework_completions','transport_vehicles','transport_routes','transport_stops','transport_allocations','school_events']);
  let schoolId;
  const query=async(sql,args=[])=>{
-  const match=sql.match(/^(\\s*INSERT INTO\\s+([a-z_]+)\\s*\\()([\\s\\S]*?)(\\)\\s*VALUES\\s*\\()([\\s\\S]*?)(\\))([\\s\\S]*)$/i);
-  if(match&&tenantTables.has(match[2].toLowerCase())&&!/\\bschool_id\\b/i.test(match[3])){
-   sql=match[1]+match[3]+',school_id'+match[4]+match[5]+', 
+  const match=sql.match(/^(\s*INSERT INTO\s+([a-z_]+)\s*\()([\s\S]*?)(\)\s*VALUES\s*\()([\s\S]*?)(\))([\s\S]*)$/i);
+  if(match&&tenantTables.has(match[2].toLowerCase())&&!/\bschool_id\b/i.test(match[3])){
+   sql=match[1]+match[3]+',school_id'+match[4]+match[5]+', $'+(args.length+1)+match[6]+match[7];
+   args=[...args,schoolId];
+  }
+  return c.query(sql,args);
+ };
+ const insert=async(sql,args=[])=>{const r=await query(sql+' RETURNING id',args);return r.rows[0].id;};
+ try{
+  await c.query('BEGIN');await c.query('SELECT pg_advisory_xact_lock(7182027)');
+  const membership=await c.query("SELECT school_id FROM school_memberships WHERE user_id=$1 AND status='active' AND is_default=true",[actor]);
+  if(!membership.rowCount)throw new Error('An active default school membership is required to import demo data.');
+  schoolId=membership.rows[0].school_id;
   if((await query('SELECT id FROM academic_years WHERE id=$1',[DEMO_YEAR_ID])).rowCount){await query('COMMIT');return {created:false,message:'Demo content already exists; existing records were not changed.'};}
   // A random, discarded password hash means demo profiles do not add public test logins.
   const hash=await bcrypt.hash(randomBytes(32).toString('hex'),12);
