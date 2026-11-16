@@ -20,6 +20,7 @@ feesRouter.get('/invoices',query(v.listQuery),c.list);
 feesRouter.post('/invoices',admin,validate(v.invoice),c.create);
 feesRouter.get('/invoices/:id',c.find);
 feesRouter.post('/invoices/:id/void',admin,validate(v.reason),c.voidInvoice);
+feesRouter.get('/invoices/:id/payments/:paymentId/receipt',c.receipt);
 feesRouter.get('/invoices/:id/payments',query(v.page),c.payments);
 feesRouter.post('/invoices/:id/payments',admin,validate(v.payment),c.pay);
 feesRouter.post('/invoices/:id/payments/:paymentId/reverse',admin,validate(v.reason),c.reverse);
