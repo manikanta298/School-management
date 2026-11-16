@@ -6,10 +6,13 @@ import request from 'supertest';
 process.env.NODE_ENV='test';process.env.JWT_SECRET='notices-test-secret'.repeat(5);process.env.DATABASE_URL='postgres://test:test@localhost/test';process.env.FRONTEND_ORIGIN='http://localhost:5173';
 const {pool}=await import('../src/config/db.js');const db=new PGlite();await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
+// Fixtures default to the initial school; second-school rows pass school_id explicitly.
+for(const {table_name} of (await query("SELECT table_name FROM information_schema.columns WHERE table_schema='public' AND column_name='school_id' AND table_name NOT IN ('school_memberships')")).rows)await query(`ALTER TABLE ${table_name} ALTER COLUMN school_id SET DEFAULT '${schoolA}'`);
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const hash=await hashPassword('NoticesPassword!123'),accounts={},tokens={},ids={};const insert=async(sql,params)=>(await query(sql,params)).rows[0].id;
 for(const [key,role] of [['admin','admin'],['t1','teacher'],['t2','teacher'],['t3','teacher'],['s1','student'],['s2','student'],['s3','student'],['parent','parent'],['otherParent','parent'],['outsider','parent']]){
- accounts[key]=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key.toLowerCase()}@example.com`,hash,role]);const r=await request(app).post('/api/auth/login').send({email:`${key.toLowerCase()}@example.com`,password:'NoticesPassword!123'});assert.equal(r.status,200);tokens[key]=r.body.accessToken;
+ accounts[key]=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key.toLowerCase()}@example.com`,hash,role]);await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolA,accounts[key],role]);const r=await request(app).post('/api/auth/login').send({email:`${key.toLowerCase()}@example.com`,password:'NoticesPassword!123'});assert.equal(r.status,200);tokens[key]=r.body.accessToken;
 }
 ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current) VALUES('Current year',CURRENT_DATE-30,CURRENT_DATE+330,true) RETURNING id");
 for(const key of ['c1','c2'])ids[key]=await insert('INSERT INTO classes(name,academic_year_id) VALUES($1,$2) RETURNING id',[key,ids.year]);
