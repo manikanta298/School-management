@@ -49,7 +49,7 @@ export async function seedDemo(actor){
   const teachers=[],teacherUsers=[];
   for(const [i,name] of ['Meera Iyer','Arjun Nair','Sara Khan'].entries()){
    const u=await account(name,'teacher',`teacher${i+1}`);teacherUsers.push(u);
-   teachers.push(await insert("INSERT INTO teachers(user_id,employee_number,joining_date,qualification) VALUES($1,$2,CURRENT_DATE-365,'M.Ed. · Demonstration staff profile')",[u,`DEMO-T${i+1}`]));
+   teachers.push(await insert("INSERT INTO teachers(user_id,employee_number,joining_date,qualification,school_id) VALUES($1,$2,CURRENT_DATE-365,'M.Ed. · Demonstration staff profile',$3)",[u,`DEMO-T${i+1}`,schoolId]));
   }
   const assignments=[];
   for(let cl=0;cl<2;cl++){
