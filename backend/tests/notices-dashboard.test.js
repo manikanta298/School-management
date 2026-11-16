@@ -13,7 +13,7 @@ for(const [key,role] of [['admin','admin'],['t1','teacher'],['t2','teacher'],['t
 }
 ids.year=await insert("INSERT INTO academic_years(name,start_date,end_date,is_current,school_id) VALUES('Current year',CURRENT_DATE-30,CURRENT_DATE+330,true,$1) RETURNING id",[schoolId]);
 for(const key of ['c1','c2'])ids[key]=await insert('INSERT INTO classes(name,academic_year_id,school_id) VALUES($1,$2,$3) RETURNING id',[key,ids.year,schoolId]);
-for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('INSERT INTO sections(name,class_id,capacity) VALUES($1,$2,40) RETURNING id',[key,ids[cl]]);
+for(const [key,cl] of [['a','c1'],['b','c1'],['c','c2']])ids[key]=await insert('INSERT INTO sections(name,class_id,capacity,school_id) VALUES($1,$2,40,$3) RETURNING id',[key,ids[cl],schoolId]);
 for(const key of ['math','science'])ids[key]=await insert('INSERT INTO subjects(name,code,school_id) VALUES($1,$2,$3) RETURNING id',[key,key.toUpperCase(),schoolId]);
 for(const [key,cl,sub] of [['t1','c1','math'],['t2','c2','science']]){
  ids[key]=await insert('INSERT INTO teachers(user_id,employee_number,joining_date) VALUES($1,$2,CURRENT_DATE-365) RETURNING id',[accounts[key],key.toUpperCase()]);
