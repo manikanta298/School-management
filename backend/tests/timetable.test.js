@@ -106,3 +106,16 @@ test('paging and query validation preserve administrative history access',async(
  for(const path of ['/slots?limit=101','/slots?weekday=8','/slots?week_start=2025-02-30','/slots/not-a-uuid']){r=await call('get',path);assert.equal(r.status,400);}
  r=await call('get','/assignments');assert.equal(r.status,200);assert.equal(r.body.items.every(a=>a.subject_id),true);
 });
+
+test('timetable, rooms and assignments are isolated between schools',async()=>{
+ const asg=await insert("INSERT INTO teacher_assignments(teacher_id,class_id,academic_year_id,kind,subject_id,school_id) VALUES($1,$2,$3,'subject_teacher',$4,$5) RETURNING id",[ids.t1,ids.c2,ids.y1,ids.math,schoolId]);
+ const mine=await call('post','/slots',slot({section_id:ids.c,assignment_id:asg,room_id:null,weekday:6,start_time:'07:00',end_time:'07:30',effective_from:'2025-10-01',effective_to:'2025-10-31'}));assert.equal(mine.status,201,JSON.stringify(mine.body));const slotId=mine.body.item.id;
+ const {rows:[sb]}=await query("INSERT INTO schools(name,slug) VALUES('School B','school-b-tt') RETURNING id");
+ const adminB=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',['adminB','adminb@example.com',hash,'admin']);
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'admin','active',true)",[sb.id,adminB]);
+ const login=await request(app).post('/api/auth/login').send({email:'adminb@example.com',password:'TimetablePassword!123'});assert.equal(login.status,200);tokens.adminB=login.body.accessToken;
+ for(const path of ['/slots','/rooms','/assignments']){const r=await call('get',path,null,'adminB');assert.equal(r.status,200,path);assert.equal(r.body.items.length,0,path);}
+ let r=await call('get',`/slots/${slotId}`,null,'adminB');assert.equal(r.status,404);
+ r=await call('post','/slots',slot({section_id:ids.c,assignment_id:asg,weekday:5}),'adminB');assert.ok([400,404,409].includes(r.status),String(r.status));
+ r=await call('get',`/slots/${slotId}`);assert.equal(r.status,200);
+});
