@@ -15,7 +15,7 @@ async function adminInsights(yearId,schoolId,c){
 export async function read(user,schoolId,c){
  const calendar=(await c.query("SELECT CURRENT_DATE::text AS today,(CURRENT_DATE-(extract(isodow FROM CURRENT_DATE)::int-1))::text AS week_start,extract(isodow FROM CURRENT_DATE)::int AS weekday,current_setting('TimeZone') AS school_timezone,CURRENT_TIMESTAMP AS generated_at")).rows[0];
  const currentYear=(await c.query('SELECT id,name,start_date,end_date FROM academic_years WHERE is_current=true')).rows[0]||null;
- const response={role:user.role,calendar,current_year:currentYear,stats:{},notices:{unread_count:await notices.unread(user,c),items:await notices.list(user,{limit:5,offset:0,q:'',unread_only:'false'},false,c)},today_sessions:await timetable.list(user,{limit:5,offset:0,week_start:calendar.week_start,weekday:calendar.weekday,include_inactive:'false'},c)};
+ const response={role:user.role,calendar,current_year:currentYear,stats:{},notices:{unread_count:await notices.unread(user,c),items:await notices.list(user,{limit:5,offset:0,q:'',unread_only:'false'},false,c)},today_sessions:await timetable.list(user,schoolId,{limit:5,offset:0,week_start:calendar.week_start,weekday:calendar.weekday,include_inactive:'false'},c)};
  if(user.role==='admin'){
  const users=(await c.query('SELECT role,count(*)::int AS total FROM users WHERE active GROUP BY role')).rows;response.stats.active_accounts=Object.fromEntries(users.map(u=>[u.role,u.total]));
  response.stats.profiles=(await c.query("SELECT (SELECT count(*)::int FROM students) AS students,(SELECT count(*)::int FROM parents) AS parents,(SELECT count(*)::int FROM teachers t JOIN users u ON u.id=t.user_id WHERE t.employment_status='active' AND u.active) AS active_teachers")).rows[0];
