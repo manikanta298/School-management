@@ -16,6 +16,7 @@ import Exams from './pages/Exams';
 import Timetable from './pages/Timetable';
 import Notices from './pages/Notices';
 import Dashboard from './pages/Dashboard';
+import SecurityActivity from './pages/SecurityActivity';
 function App(){
  const [user,setUser]=useState(null),[loading,setLoading]=useState(true),[page,setPage]=useState('dashboard'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[users,setUsers]=useState([]),[offset,setOffset]=useState(0),[focusedNotice,setFocusedNotice]=useState(null);
  const [schools,setSchools]=useState([]),[activeSchoolId,setActiveSchoolId]=useState(null);
@@ -48,7 +49,7 @@ function App(){
  {page==='staff'&&user.role==='admin'&&<Staff/>}
  {page==='academic'&&<AcademicSetup user={user}/>}
  {page==='dashboard'&&<Dashboard user={user} onNavigate={target=>{if(target==='users')run(async()=>{await loadUsers();setPage('users');});else{if(target==='notices')setFocusedNotice(null);setPage(target);}}} onOpenNotice={id=>{setFocusedNotice(id);setPage('notices');}}/>}
- {page==='password'&&<section><h1>Change password</h1><form onSubmit={change}>{field('currentPassword','Current password','password')}{field('newPassword','New password (12+ characters, maximum 72 UTF-8 bytes)','password',12)}<button disabled={busy}>Update password and sign out</button></form></section>}
+ {page==='password'&&<section><h1>Change password</h1><form onSubmit={change}>{field('currentPassword','Current password','password')}{field('newPassword','New password (12+ characters, maximum 72 UTF-8 bytes)','password',12)}<button disabled={busy}>Update password and sign out</button></form><SecurityActivity onSignedOut={()=>{clearToken();setUser(null);setUsers([]);setSchools([]);}}/></section>}
  {page==='users'&&user.role==='admin'&&<section><h1>Manage users</h1><div className="grid"><div className="card"><h2>Create account</h2><form onSubmit={create}>{field('name','Full name')}{field('email','Email','email')}{field('password','Initial password (12+ characters)','password',12)}<label>Role<select name="role">{['teacher','student','parent','admin'].map(r=><option key={r}>{r}</option>)}</select></label><button disabled={busy}>Create account</button></form></div><div><h2>Accounts</h2>{users.map(u=><article className="card" key={u.id}><h3>{u.name}</h3><p>{u.email} · {u.role}</p><details><summary>Reset password</summary><form onSubmit={e=>reset(e,u.id)}>{field('newPassword','New password','password',12)}<button disabled={busy}>Reset and revoke sessions</button></form></details></article>)}<button disabled={busy||offset===0} onClick={()=>run(()=>loadUsers(Math.max(0,offset-25)))}>Previous</button> <button disabled={busy||users.length<25} onClick={()=>run(()=>loadUsers(offset+25))}>Next</button></div></div></section>}
  </> }</AppShell>;
 }
