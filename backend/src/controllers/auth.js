@@ -11,6 +11,8 @@ export async function login(req,res) {
  sendSession(res,await auth.issue(user));
 }
 export async function refresh(req,res) {try {sendSession(res,await auth.rotate(req.cookies.refreshToken));}catch(e){res.clearCookie('refreshToken',cookieOptions);throw e;}}
+export async function schools(req,res) {res.json({items:await auth.schoolsFor(req.user.id),activeSchoolId:req.schoolId});}
+export async function switchSchool(req,res) {const user=await users.byId(req.user.id);if(!user?.active) throw auth.fail(401,'Authentication required');sendSession(res,await auth.switchSchool(user,req.sessionId,req.body.school_id));}
 export async function logout(req,res) {
  if(req.cookies.refreshToken) await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE token_hash=$1',[auth.digest(req.cookies.refreshToken)]);
  res.clearCookie('refreshToken',cookieOptions);res.status(204).end();

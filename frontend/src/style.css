@@ -9,3 +9,5 @@
  body.printing-report .printable-report{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none}
  .no-print{display:none!important}
 }
+
+.school-switch{display:grid;gap:4px;margin:0 12px 10px}.school-switch select{width:100%}

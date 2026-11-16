@@ -10,6 +10,8 @@ authRouter.post('/login',strict,v.validate(v.login),c.login);
 authRouter.post('/refresh',strict,originGuard,c.refresh);
 authRouter.post('/logout',originGuard,c.logout);
 authRouter.get('/me',authenticate,(req,res)=>res.json({user:req.user}));
+authRouter.get('/schools',authenticate,c.schools);
+authRouter.post('/switch-school',strict,originGuard,authenticate,v.validate(v.switchSchool),c.switchSchool);
 authRouter.post('/change-password',strict,authenticate,v.validate(v.changePassword),c.changePassword);
 usersRouter.use(authenticate,authorize('admin'));
 usersRouter.get('/',c.listUsers);

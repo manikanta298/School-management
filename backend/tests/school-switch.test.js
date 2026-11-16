@@ -1,0 +1,41 @@
+import {test,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+import request from 'supertest';
+process.env.NODE_ENV='test';process.env.JWT_SECRET='school-switch-secret'.repeat(4);process.env.DATABASE_URL='postgres://test:test@localhost/test';process.env.FRONTEND_ORIGIN='http://localhost:5173';
+const {pool}=await import('../src/config/db.js');const db=new PGlite();
+await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
+const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
+const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
+const PW='SwitchPassword!123',hash=await hashPassword(PW),origin='http://localhost:5173';
+const insert=async(sql,p)=>(await query(sql,p)).rows[0].id;
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
+const schoolB=await insert("INSERT INTO schools(name,slug) VALUES('School B','school-b-sw') RETURNING id");
+const schoolC=await insert("INSERT INTO schools(name,slug) VALUES('School C','school-c-sw') RETURNING id");
+const uid=await insert("INSERT INTO users(name,email,password_hash,role) VALUES('Multi','multi@example.com',$1,'admin') RETURNING id",[hash]);
+await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'admin','active',true)",[schoolA,uid]);
+await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'teacher','active',false)",[schoolB,uid]);
+await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'teacher','suspended',false)",[schoolC,uid]);
+after(async()=>{await db.close();await pool.end();});
+const bearer=t=>({Authorization:`Bearer ${t}`});
+test('users switch only between active memberships and the old session is revoked',async()=>{
+ const login=await request(app).post('/api/auth/login').send({email:'multi@example.com',password:PW});assert.equal(login.status,200);assert.equal(login.body.activeSchoolId,schoolA);
+ const t1=login.body.accessToken;
+ let r=await request(app).get('/api/auth/schools').set(bearer(t1));assert.equal(r.status,200);
+ assert.deepEqual(r.body.items.map(s=>s.id).sort(),[schoolA,schoolB].sort());assert.equal(r.body.activeSchoolId,schoolA);
+ r=await request(app).post('/api/auth/switch-school').set('Origin','https://evil.example').set(bearer(t1)).send({school_id:schoolB});assert.equal(r.status,403);
+ r=await request(app).post('/api/auth/switch-school').set('Origin',origin).send({school_id:schoolB});assert.equal(r.status,401);
+ r=await request(app).post('/api/auth/switch-school').set('Origin',origin).set(bearer(t1)).send({school_id:'not-a-uuid'});assert.equal(r.status,400);
+ for(const bad of [schoolC,'00000000-0000-4000-8000-000000000000']){
+  r=await request(app).post('/api/auth/switch-school').set('Origin',origin).set(bearer(t1)).send({school_id:bad});assert.equal(r.status,403,bad);
+ }
+ r=await request(app).get('/api/auth/me').set(bearer(t1));assert.equal(r.status,200);assert.equal(r.body.user.role,'admin');
+ r=await request(app).post('/api/auth/switch-school').set('Origin',origin).set(bearer(t1)).send({school_id:schoolB});assert.equal(r.status,200);assert.equal(r.body.activeSchoolId,schoolB);assert.equal(r.body.user.role,'teacher');
+ const t2=r.body.accessToken;
+ r=await request(app).get('/api/auth/me').set(bearer(t1));assert.equal(r.status,401);
+ r=await request(app).get('/api/auth/me').set(bearer(t2));assert.equal(r.status,200);assert.equal(r.body.user.role,'teacher');
+ r=await request(app).get('/api/staff').set(bearer(t2));assert.equal(r.status,403);
+ await query("UPDATE school_memberships SET status='suspended' WHERE user_id=$1 AND school_id=$2",[uid,schoolB]);
+ r=await request(app).get('/api/auth/me').set(bearer(t2));assert.equal(r.status,401);
+});
