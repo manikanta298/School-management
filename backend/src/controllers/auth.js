@@ -7,12 +7,21 @@ function sendSession(res,result) {res.cookie('refreshToken',result.refresh,{...c
 export async function login(req,res) {
  const user=await users.byEmail(req.body.email);
  const valid=await auth.matches(req.body.password,user?.password_hash || auth.dummyHash);
- if(!user || !valid || !user.active) throw auth.fail(401,'Invalid email or password');
- sendSession(res,await auth.issue(user));
+ if(!user || !valid || !user.active) {await auth.recordLogin(req,{userId:user?.id??null,email:req.body.email,success:false,reason:!user?'unknown_user':!valid?'bad_password':'inactive'});throw auth.fail(401,'Invalid email or password');}
+ let result;try {result=await auth.issue(user,undefined,null,auth.clientMeta(req));} catch(e) {await auth.recordLogin(req,{userId:user.id,email:user.email,success:false,reason:'no_membership'});throw e;}
+ await auth.recordLogin(req,{userId:user.id,email:user.email,success:true,schoolId:result.schoolId});sendSession(res,result);
 }
 export async function refresh(req,res) {try {sendSession(res,await auth.rotate(req.cookies.refreshToken));}catch(e){res.clearCookie('refreshToken',cookieOptions);throw e;}}
 export async function schools(req,res) {res.json({items:await auth.schoolsFor(req.user.id),activeSchoolId:req.schoolId});}
-export async function switchSchool(req,res) {const user=await users.byId(req.user.id);if(!user?.active) throw auth.fail(401,'Authentication required');sendSession(res,await auth.switchSchool(user,req.sessionId,req.body.school_id));}
+export async function switchSchool(req,res) {const user=await users.byId(req.user.id);if(!user?.active) throw auth.fail(401,'Authentication required');sendSession(res,await auth.switchSchool(user,req.sessionId,req.body.school_id,auth.clientMeta(req)));}
+export async function sessions(req,res) {res.json({items:await auth.listSessions(req.user.id,req.sessionId)});}
+export async function revokeSession(req,res) {
+ if(!await auth.revokeSession(req.user.id,req.params.id)) throw auth.fail(404,'Session not found');
+ if(req.params.id===req.sessionId) res.clearCookie('refreshToken',cookieOptions);
+ res.status(204).end();
+}
+export async function logoutAll(req,res) {await auth.revokeAll(req.user.id);res.clearCookie('refreshToken',cookieOptions);res.status(204).end();}
+export async function loginHistory(req,res) {res.json({items:await auth.loginHistory(req.user.id)});}
 export async function logout(req,res) {
  if(req.cookies.refreshToken) await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE token_hash=$1',[auth.digest(req.cookies.refreshToken)]);
  res.clearCookie('refreshToken',cookieOptions);res.status(204).end();
