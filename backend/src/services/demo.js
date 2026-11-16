@@ -8,9 +8,19 @@ export async function seedDemo(actor){
  const tenantTables=new Set(['academic_years','terms','classes','sections','subjects','teachers','teacher_assignments','students','parents','student_parents','enrollments','attendance_registers','attendance_entries','attendance_audit','fee_structures','fee_invoices','fee_payments','fee_events','exam_grading_scales','exam_grade_bands','exams','exam_candidates','exam_papers','exam_marks','exam_mark_audit','exam_events','school_rooms','timetable_slots','timetable_audit','notices','notice_reads','notice_audit','student_status_history','staff_members','homework','homework_completions','transport_vehicles','transport_routes','transport_stops','transport_allocations','school_events']);
  let schoolId;
  const query=async(sql,args=[])=>{
-  const match=sql.match(/^(\s*INSERT INTO\s+([a-z_]+)\s*\()([\s\S]*?)(\)\s*VALUES\s*\()([\s\S]*?)(\))([\s\S]*)$/i);
+  const match=sql.match(/^(\s*INSERT INTO\s+([a-z_]+)\s*\()([\s\S]*?)(\)\s*VALUES\s*\()/i);
   if(match&&tenantTables.has(match[2].toLowerCase())&&!/\bschool_id\b/i.test(match[3])){
-   sql=match[1]+match[3]+',school_id'+match[4]+match[5]+', $'+(args.length+1)+match[6]+match[7];
+   const valueStart=match[0].length;
+   let depth=1,quote=null,end=-1;
+   for(let i=valueStart;i<sql.length;i++){
+    const ch=sql[i];
+    if(quote){if(ch===quote){if(sql[i+1]===quote){i++;continue;}quote=null;}continue;}
+    if(ch==="'"||ch==='"'){quote=ch;continue;}
+    if(ch==='(')depth++;
+    else if(ch===')'&&--depth===0){end=i;break;}
+   }
+   if(end<0)throw new Error('Unable to parse tenant insert statement.');
+   sql=match[1]+match[3]+',school_id'+match[4]+sql.slice(valueStart,end)+', $'+(args.length+1)+sql.slice(end);
    args=[...args,schoolId];
   }
   return c.query(sql,args);
