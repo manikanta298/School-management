@@ -50,7 +50,7 @@ test('failed demo import rolls back all inserted records and preserves an existi
  const separate=new PGlite();await separate.exec(schema);const originalConnect=pool.connect;
  const q=async(sql,args)=>{const r=args?await separate.query(sql,args):(await separate.exec(sql)).at(-1);return {...r,rowCount:r.rows?.length||r.affectedRows||0};};
  await q("INSERT INTO users(id,name,email,password_hash,role) VALUES($1,'Existing admin','existing@example.invalid',$2,'admin')",[admin.id,admin.password_hash]);
- await q("INSERT INTO academic_years(name,start_date,end_date,is_current) VALUES('Real current year',CURRENT_DATE-150,CURRENT_DATE+200,true)");
+ await q("INSERT INTO academic_years(name,start_date,end_date,is_current,school_id) VALUES('Real current year',CURRENT_DATE-150,CURRENT_DATE+200,true,$1)",[schoolId]);
  pool.connect=async()=>({query:async(sql,args)=>{if(sql.startsWith('INSERT INTO teachers'))throw new Error('Injected failure');return q(sql,args);},release(){}});
  try{await assert.rejects(seedDemo(admin.id),/Injected failure/);assert.equal((await q('SELECT count(*)::int AS n FROM users')).rows[0].n,1);assert.equal((await q('SELECT id FROM academic_years WHERE id=$1',[DEMO_YEAR_ID])).rowCount,0);assert.equal((await q('SELECT name FROM academic_years WHERE is_current')).rows[0].name,'Real current year');pool.connect=async()=>({query:q,release(){}});const result=await seedDemo(admin.id);assert.equal(result.is_current,false);assert.equal((await q('SELECT name FROM academic_years WHERE is_current')).rows[0].name,'Real current year');}
  finally{pool.connect=originalConnect;await separate.close();}
