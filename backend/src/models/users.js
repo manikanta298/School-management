@@ -12,7 +12,7 @@ export async function create(data,hash,schoolId) {
  try {
   await client.query('BEGIN');
   const {rows:[user]}=await client.query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id,name,email,role,active',[data.name,data.email,hash,data.role]);
-  await client.query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',false)",[schoolId,user.id,data.role]);
+  await client.query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolId,user.id,data.role]);
   await client.query('COMMIT');return user;
  } catch(e) {await client.query('ROLLBACK');throw e;} finally {client.release();}
 }
