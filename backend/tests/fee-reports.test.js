@@ -8,11 +8,14 @@ process.env.NODE_ENV='test';process.env.JWT_SECRET='fee-reports-secret'.repeat(5
 const {pool}=await import('../src/config/db.js');const db=new PGlite();
 await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
+// Fixtures default to the initial school; second-school rows pass school_id explicitly.
+for(const {table_name} of (await query("SELECT table_name FROM information_schema.columns WHERE table_schema='public' AND column_name='school_id' AND table_name NOT IN ('school_memberships')")).rows)await query(`ALTER TABLE ${table_name} ALTER COLUMN school_id SET DEFAULT '${schoolA}'`);
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const password='FeeReports!12345',hash=await hashPassword(password),accounts={},tokens={},ids={};
 const insert=async(sql,params)=>(await query(sql,params)).rows[0].id;
 for(const [key,role] of [['admin','admin'],['parent','parent'],['s1','student'],['s2','student'],['s3','student']]){
- accounts[key]=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key}@example.com`,hash,role]);
+ accounts[key]=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[key,`${key}@example.com`,hash,role]);await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolA,accounts[key],role]);
  const login=await request(app).post('/api/auth/login').send({email:`${key}@example.com`,password});assert.equal(login.status,200);tokens[key]=login.body.accessToken;
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
