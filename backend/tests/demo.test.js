@@ -10,12 +10,15 @@ const query=async(text,params)=>{const r=params?await db.query(text,params):(awa
 pool.query=query;pool.connect=async()=>({query,release(){}});
 const {app}=await import('../src/app.js');const {issue,hashPassword}=await import('../src/services/auth.js');const {seedDemo,DEMO_YEAR_ID}=await import('../src/services/demo.js');
 const admin=(await query("INSERT INTO users(name,email,password_hash,role) VALUES('QA Administrator','qa-admin@example.invalid',$1,'admin') RETURNING *",[await hashPassword('QA-Only-Strong-Password!')])).rows[0];
+const schoolId=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
+await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'admin','active',true)",[schoolId,admin.id]);
 const adminToken=(await issue(admin)).accessToken;
 const call=(method,path,token=adminToken,body)=>{const r=request(app)[method]('/api/'+path).set('Origin',process.env.FRONTEND_ORIGIN);if(token)r.set('Authorization',`Bearer ${token}`);return body?r.send(body):r;};
 after(async()=>{await db.close();await pool.end();});
 test('demo import requires administrator, trusted origin and explicit confirmation',async()=>{
  assert.equal((await call('post','demo',null,{confirmation:'LOAD_DEMO_DATA'})).status,401);
  const parent=(await query("INSERT INTO users(name,email,password_hash,role) VALUES('Outsider','outsider@example.invalid',$1,'parent') RETURNING *",[admin.password_hash])).rows[0];
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'parent','active',true)",[schoolId,parent.id]);
  assert.equal((await call('post','demo',(await issue(parent)).accessToken,{confirmation:'LOAD_DEMO_DATA'})).status,403);
  assert.equal((await call('post','demo',adminToken,{confirmation:'LOAD_DEMO_DATA'}).set('Origin','https://untrusted.example')).status,403);
  assert.equal((await call('post','demo',adminToken,{confirmation:'other'})).status,400);
