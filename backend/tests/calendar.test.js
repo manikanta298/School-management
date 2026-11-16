@@ -7,10 +7,13 @@ process.env.NODE_ENV='test';process.env.JWT_SECRET='calendar-test-secret'.repeat
 const {pool}=await import('../src/config/db.js');const db=new PGlite();
 await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
 const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
+// Fixtures default to the initial school; second-school rows pass school_id explicitly.
+for(const {table_name} of (await query("SELECT table_name FROM information_schema.columns WHERE table_schema='public' AND column_name='school_id' AND table_name NOT IN ('school_memberships')")).rows)await query(`ALTER TABLE ${table_name} ALTER COLUMN school_id SET DEFAULT '${schoolA}'`);
 const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
 const hash=await hashPassword('CalendarPassword!123'),tokens={};
 for(const role of ['admin','teacher','student','parent']){
- await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)',[role,`${role}@example.com`,hash,role]);
+ const uid=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[role,`${role}@example.com`,hash,role])).rows[0].id;await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolA,uid,role]);
  const login=await request(app).post('/api/auth/login').send({email:`${role}@example.com`,password:'CalendarPassword!123'});assert.equal(login.status,200);tokens[role]=login.body.accessToken;
 }
 const call=(method,path,body,who='admin')=>{const req=request(app)[method]('/api/'+path).set('Authorization',`Bearer ${tokens[who]}`);return body?req.send(body):req;};
@@ -32,4 +35,21 @@ test('everyone reads the calendar but only admins change it',async()=>{
  r=await call('put','calendar/00000000-0000-4000-8000-000000000999',{title:'T',event_type:'event',starts_on:day(5)});assert.equal(r.status,404);
  r=await call('delete',`calendar/${id}`);assert.equal(r.status,204);r=await call('delete',`calendar/${id}`);assert.equal(r.status,404);
  r=await call('get','calendar/not-a-uuid');assert.equal(r.status,404);
+});
+test('calendar events are isolated between schools',async()=>{
+ const {rows:[sb]}=await query("INSERT INTO schools(name,slug) VALUES('School B','school-b') RETURNING id");const schoolB=sb.id;
+ for(const [name,role] of [['adminb','admin'],['studentb','student']]){const id=(await query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',[name,`${name}@example.com`,hash,role])).rows[0].id;await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolB,id,role]);const r=await request(app).post('/api/auth/login').send({email:`${name}@example.com`,password:'CalendarPassword!123'});assert.equal(r.status,200);tokens[name]=r.body.accessToken;}
+ let r=await call('post','calendar',{title:'Isolation holiday',event_type:'holiday',starts_on:day(40),ends_on:day(41)});assert.equal(r.status,201);const idA=r.body.item.id;
+ // School B sees none of School A's events and cannot change or delete them.
+ for(const who of ['adminb','studentb']){r=await call('get',`calendar?from=${day(39)}&to=${day(42)}`,undefined,who);assert.equal(r.status,200);assert.deepEqual(r.body.items,[],who);}
+ r=await call('put',`calendar/${idA}`,{title:'Hijack',event_type:'event',starts_on:day(40)},'adminb');assert.equal(r.status,404);
+ r=await call('delete',`calendar/${idA}`,undefined,'adminb');assert.equal(r.status,404);
+ // School B keeps its own calendar.
+ r=await call('post','calendar',{title:'Isolation holiday',event_type:'holiday',starts_on:day(40),ends_on:day(41)},'adminb');assert.equal(r.status,201);const idB=r.body.item.id;
+ r=await call('get',`calendar?from=${day(39)}&to=${day(42)}`,undefined,'studentb');assert.deepEqual(r.body.items.map(i=>i.id),[idB]);
+ r=await call('get',`calendar?from=${day(39)}&to=${day(42)}`);assert.deepEqual(r.body.items.map(i=>i.id),[idA]);
+ r=await call('put',`calendar/${idB}`,{title:'Hijack',event_type:'event',starts_on:day(40)});assert.equal(r.status,404);
+ r=await call('delete',`calendar/${idB}`);assert.equal(r.status,404);
+ r=await call('delete',`calendar/${idB}`,undefined,'adminb');assert.equal(r.status,204);
+ r=await call('get',`calendar?from=${day(39)}&to=${day(42)}`);assert.deepEqual(r.body.items.map(i=>i.id),[idA]);
 });

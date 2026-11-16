@@ -1705,3 +1705,7 @@ ALTER TABLE homework_completions
 CREATE INDEX homework_school_section_due_idx ON homework(school_id, section_id, due_on);
 CREATE INDEX homework_school_class_year_idx ON homework(school_id, class_id, academic_year_id);
 CREATE INDEX homework_completions_school_student_idx ON homework_completions(school_id, student_id);
+
+-- School events belong to exactly one school (school_id was added and backfilled in migration 018).
+-- Reads and writes are filtered by the active school in the routes; this index supports those queries.
+CREATE INDEX school_events_school_dates_idx ON school_events(school_id, starts_on, ends_on);
