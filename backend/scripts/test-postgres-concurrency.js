@@ -70,12 +70,13 @@ try{
  assert.ok(refused.every(r=>r.reason.code==='23514'),'overpayments are rejected by the payment guard');
  const paid=Number((await testPool.query('SELECT coalesce(sum(amount_minor),0) AS total FROM fee_payments WHERE invoice_id=$1 AND reversed_at IS NULL',[invoice])).rows[0].total);
  assert.equal(paid,8000,'collected amount must never exceed the invoice');
- const receipts=accepted.map(r=>r.value.rows[0].receipt_number);assert.equal(new Set(receipts).size,receipts.length,'receipt numbers are unique');
+ const receipts=accepted.map(r=>Number(r.value.rows[0].receipt_number)).sort((x,y)=>x-y);assert.deepEqual(receipts,[1,2],'receipt numbers are per school, consecutive and gap-free even though 4 payments were rejected');
  const key='11111111-1111-4111-8111-111111111111';
  const replays=await Promise.allSettled([pay(1000,key),pay(1000,key),pay(1000,key)]);
  assert.equal(replays.filter(r=>r.status==='fulfilled').length,1,'one payment per idempotency key');
  assert.ok(replays.filter(r=>r.status==='rejected').every(r=>r.reason.code==='23505'));
  assert.equal(Number((await testPool.query('SELECT sum(amount_minor) AS total FROM fee_payments WHERE invoice_id=$1 AND reversed_at IS NULL',[invoice])).rows[0].total),9000);
+ assert.deepEqual((await testPool.query('SELECT receipt_number FROM fee_payments WHERE invoice_id=$1 ORDER BY receipt_number',[invoice])).rows.map(r=>Number(r.receipt_number)),[1,2,3],'replays that were rejected did not consume receipt numbers');
  process.stdout.write('PostgreSQL fee payment race: passed (no overpayment, unique receipts, idempotent replays).\n');
 }finally{
  try{if(testPool)await testPool.end();}
