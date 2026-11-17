@@ -38,6 +38,9 @@ export async function listSessions(userId,currentId) {
 export async function revokeSession(userId,id) {return (await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL RETURNING id',[id,userId])).rows[0];}
 export async function revokeAll(userId) {await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',[userId]);}
 export async function loginHistory(userId) {return (await pool.query('SELECT e.id,e.success,e.reason,e.ip,e.user_agent,e.created_at,s.name AS school_name FROM login_events e LEFT JOIN schools s ON s.id=e.school_id WHERE e.user_id=$1 ORDER BY e.created_at DESC LIMIT 50',[userId])).rows;}
+export async function memberOfSchool(userId,schoolId) {return (await pool.query('SELECT 1 FROM school_memberships WHERE user_id=$1 AND school_id=$2',[userId,schoolId])).rowCount>0;}
+export async function adminRevokeSessions(userId,schoolId) {return (await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND active_school_id=$2 AND revoked_at IS NULL RETURNING id',[userId,schoolId])).rowCount;}
+export async function adminLoginHistory(userId,schoolId) {return (await pool.query('SELECT e.id,e.success,e.reason,e.ip,e.user_agent,e.created_at FROM login_events e WHERE e.user_id=$1 AND (e.school_id=$2 OR e.school_id IS NULL) ORDER BY e.created_at DESC LIMIT 100',[userId,schoolId])).rows;}
 export async function rotate(token) {
  if(!token || !/^[a-f0-9]{96}$/.test(token)) throw fail(401,'Session expired');
  const c=await pool.connect();

@@ -45,3 +45,26 @@ test('users list and revoke their own sessions; logout-all ends everything',asyn
  r=await request(app).get('/api/auth/me').set(bearer(o.body.accessToken));assert.equal(r.status,200);
  r=await request(app).get('/api/auth/sessions');assert.equal(r.status,401);
 });
+
+test('school admins can force sign-out and view history only for users of their own school',async()=>{
+ const schoolB=await insert("INSERT INTO schools(name,slug) VALUES('School B','school-b-adm') RETURNING id",[]);
+ const mkB=async(email,role)=>{const id=await insert("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id",[email,email,hash,role]);await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[schoolB,id,role]);return id;};
+ const adminB=await mkB('adminb@example.com','admin');const teacherB=await mkB('teacherb@example.com','teacher');
+ const victim=await login('two@example.com');assert.equal(victim.status,200);
+ const boss=await login('one@example.com');
+ const post=(path,tok,origin_=origin)=>request(app).post(path).set('Origin',origin_).set(bearer(tok));
+ let r=await post(`/api/auth/admin/users/${other}/revoke-sessions`,boss.body.accessToken,'https://evil.example');assert.equal(r.status,403);
+ const tA=await insert("INSERT INTO users(name,email,password_hash,role) VALUES('teachera','teachera@example.com',$1,'teacher') RETURNING id",[hash]);await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'teacher','active',true)",[schoolA,tA]);
+ const teacherALogin=await login('teachera@example.com');
+ r=await request(app).get(`/api/auth/admin/users/${other}/login-history`).set(bearer(teacherALogin.body.accessToken));assert.equal(r.status,403);
+ r=await request(app).get(`/api/auth/admin/users/${other}/login-history`).set(bearer(boss.body.accessToken));assert.equal(r.status,200);assert.ok(r.body.items.length>=1);
+ r=await post('/api/auth/admin/users/not-a-uuid/revoke-sessions',boss.body.accessToken);assert.equal(r.status,400);
+ const adminBLogin=await login('adminb@example.com');
+ r=await post(`/api/auth/admin/users/${other}/revoke-sessions`,adminBLogin.body.accessToken);assert.equal(r.status,404);
+ r=await request(app).get(`/api/auth/admin/users/${other}/login-history`).set(bearer(adminBLogin.body.accessToken));assert.equal(r.status,404);
+ r=await request(app).get('/api/auth/me').set(bearer(victim.body.accessToken));assert.equal(r.status,200);
+ r=await post(`/api/auth/admin/users/${other}/revoke-sessions`,boss.body.accessToken);assert.equal(r.status,200);assert.ok(r.body.revoked>=1);
+ r=await request(app).get('/api/auth/me').set(bearer(victim.body.accessToken));assert.equal(r.status,401);
+ r=await request(app).get('/api/auth/me').set(bearer(boss.body.accessToken));assert.equal(r.status,200);
+ const t=await login('teacherb@example.com');r=await post(`/api/auth/admin/users/${adminB}/revoke-sessions`,t.body.accessToken);assert.equal(r.status,403);
+});
