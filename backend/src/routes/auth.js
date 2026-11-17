@@ -24,4 +24,5 @@ authRouter.post('/change-password',strict,authenticate,v.validate(v.changePasswo
 usersRouter.use(authenticate,authorize('admin'));
 usersRouter.get('/',c.listUsers);
 usersRouter.post('/',v.validate(v.createUser),c.createUser);
+usersRouter.post('/:id/temporary-password',strict,c.temporaryPassword);
 usersRouter.post('/:id/reset-password',strict,v.validate(v.resetPassword),c.resetPassword);
