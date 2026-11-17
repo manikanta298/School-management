@@ -46,8 +46,16 @@ export async function listUsers(req,res) {
  if(!Number.isInteger(limit)||limit<1||limit>100||!Number.isInteger(offset)||offset<0) throw auth.fail(400,'Invalid pagination');
  res.json({users:await users.list(limit,offset,req.schoolId)});
 }
+export async function temporaryPassword(req,res) {
+ if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) throw auth.fail(400,'Invalid user ID');
+ if(req.params.id===req.user.id) throw auth.fail(400,'Use change password for your own account');
+ if(!await users.byId(req.params.id,req.schoolId)) throw auth.fail(404,'User not found');
+ const temporaryPassword=auth.generateTemporaryPassword();
+ await auth.replacePassword(req.params.id,await auth.hashPassword(temporaryPassword),true);
+ res.set('Cache-Control','no-store').json({temporaryPassword,mustChangePassword:true});
+}
 export async function resetPassword(req,res) {
  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) throw auth.fail(400,'Invalid user ID');
  if(!await users.byId(req.params.id,req.schoolId)) throw auth.fail(404,'User not found');
- await auth.replacePassword(req.params.id,await auth.hashPassword(req.body.newPassword));res.status(204).end();
+ await auth.replacePassword(req.params.id,await auth.hashPassword(req.body.newPassword),true);res.status(204).end();
 }

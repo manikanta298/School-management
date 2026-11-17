@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { randomBytes,randomUUID,createHash } from 'node:crypto';
+import { randomBytes,randomInt,randomUUID,createHash } from 'node:crypto';
 import { pool } from '../config/db.js';
 import { env } from '../config/env.js';
 import { publicUser } from '../models/users.js';
@@ -41,6 +41,8 @@ export async function loginHistory(userId) {return (await pool.query('SELECT e.i
 export async function memberOfSchool(userId,schoolId) {return (await pool.query('SELECT 1 FROM school_memberships WHERE user_id=$1 AND school_id=$2',[userId,schoolId])).rowCount>0;}
 export async function adminRevokeSessions(userId,schoolId) {return (await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND active_school_id=$2 AND revoked_at IS NULL RETURNING id',[userId,schoolId])).rowCount;}
 export async function adminLoginHistory(userId,schoolId) {return (await pool.query('SELECT e.id,e.success,e.reason,e.ip,e.user_agent,e.created_at FROM login_events e WHERE e.user_id=$1 AND (e.school_id=$2 OR e.school_id IS NULL) ORDER BY e.created_at DESC LIMIT 100',[userId,schoolId])).rows;}
+const TEMP_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+export function generateTemporaryPassword() {let out='';for(let i=0;i<16;i++) out+=TEMP_ALPHABET[randomInt(TEMP_ALPHABET.length)];return `${out.slice(0,4)}-${out.slice(4,8)}-${out.slice(8,12)}-${out.slice(12)}`;}
 export async function rotate(token) {
  if(!token || !/^[a-f0-9]{96}$/.test(token)) throw fail(401,'Session expired');
  const c=await pool.connect();
@@ -57,6 +59,6 @@ export async function rotate(token) {
   const result=await issue(u,c,s.active_school_id,{userAgent:s.user_agent,ip:s.ip});await c.query('COMMIT');return result;
  } catch(e) {await c.query('ROLLBACK');throw e;} finally {c.release();}
 }
-export async function replacePassword(userId,hash) {
- const c=await pool.connect();try {await c.query('BEGIN');await c.query('UPDATE users SET password_hash=$1,updated_at=now() WHERE id=$2',[hash,userId]);await c.query('UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',[userId]);await c.query('COMMIT');} catch(e) {await c.query('ROLLBACK');throw e;} finally {c.release();}
+export async function replacePassword(userId,hash,mustChange=false) {
+ const c=await pool.connect();try {await c.query('BEGIN');await c.query('UPDATE users SET password_hash=$1,must_change_password=$3,updated_at=now() WHERE id=$2',[hash,userId,mustChange]);await c.query('UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',[userId]);await c.query('COMMIT');} catch(e) {await c.query('ROLLBACK');throw e;} finally {c.release();}
 }

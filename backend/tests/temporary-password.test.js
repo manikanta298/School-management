@@ -1,0 +1,51 @@
+import {test,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+import request from 'supertest';
+process.env.NODE_ENV='test';process.env.JWT_SECRET='temp-password-secret'.repeat(4);process.env.DATABASE_URL='postgres://test:test@localhost/test';process.env.FRONTEND_ORIGIN='http://localhost:5173';
+const {pool}=await import('../src/config/db.js');const db=new PGlite();
+await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
+const query=async(text,params)=>{const r=await db.query(text,params);return {...r,rowCount:r.rows.length||r.affectedRows||0};};pool.query=query;pool.connect=async()=>({query,release(){}});
+const {app}=await import('../src/app.js');const {hashPassword}=await import('../src/services/auth.js');
+const PW='TempPassword!12345',hash=await hashPassword(PW),origin='http://localhost:5173';
+const insert=async(sql,p)=>(await query(sql,p)).rows[0].id;
+const schoolA=(await query("SELECT id FROM schools WHERE slug='existing-school'")).rows[0].id;
+const schoolB=await insert("INSERT INTO schools(name,slug) VALUES('School B','school-b-tmp') RETURNING id",[]);
+const mk=async(email,role,school=schoolA)=>{const id=await insert("INSERT INTO users(name,email,password_hash,role) VALUES($1,$1,$2,$3) RETURNING id",[email,hash,role]);await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,$3,'active',true)",[school,id,role]);return id;};
+const admin=await mk('admin@example.com','admin'),teacher=await mk('teacher@example.com','teacher'),adminB=await mk('adminb@example.com','admin',schoolB);
+after(async()=>{await db.close();await pool.end();});
+const bearer=t=>({Authorization:`Bearer ${t}`});
+const login=(email,password=PW)=>request(app).post('/api/auth/login').send({email,password});
+const issue=(token,id)=>request(app).post(`/api/users/${id}/temporary-password`).set(bearer(token));
+test('only school admins can issue temporary passwords, for users of their own school',async()=>{
+ const a=(await login('admin@example.com')).body.accessToken,t=(await login('teacher@example.com')).body.accessToken,b=(await login('adminb@example.com')).body.accessToken;
+ assert.equal((await issue(t,admin)).status,403);
+ assert.equal((await request(app).post(`/api/users/${teacher}/temporary-password`)).status,401);
+ assert.equal((await issue(a,admin)).status,400);
+ assert.equal((await issue(a,'not-a-uuid')).status,400);
+ assert.equal((await issue(b,teacher)).status,404);
+ assert.equal((await issue(a,'00000000-0000-4000-8000-000000000000')).status,404);
+});
+test('a temporary password is random, shown once, forces a change and revokes old sessions',async()=>{
+ const a=(await login('admin@example.com')).body.accessToken,old=(await login('teacher@example.com')).body.accessToken;
+ let r=await issue(a,teacher);assert.equal(r.status,200);assert.match(r.headers['cache-control'],/no-store/);
+ const temp=r.body.temporaryPassword;assert.match(temp,/^[A-Za-z0-9]{4}(-[A-Za-z0-9]{4}){3}$/);assert.equal(r.body.mustChangePassword,true);
+ assert.notEqual((await issue(a,teacher)).body.temporaryPassword,temp,'each issue is different');
+ const second=(await issue(a,teacher)).body.temporaryPassword;
+ const stored=(await query('SELECT password_hash,must_change_password FROM users WHERE id=$1',[teacher])).rows[0];assert.ok(!stored.password_hash.includes(second));assert.equal(stored.must_change_password,true);
+ assert.equal((await request(app).get('/api/auth/me').set(bearer(old))).status,401,'old session revoked');
+ assert.equal((await login('teacher@example.com',temp)).status,401,'superseded temporary password no longer works');
+ const l=await login('teacher@example.com',second);assert.equal(l.status,200);assert.equal(l.body.user.mustChangePassword,true);const tok=l.body.accessToken;
+ assert.equal((await request(app).get('/api/auth/me').set(bearer(tok))).status,200);
+ for(const path of ['/api/auth/schools','/api/students','/api/dashboard','/api/auth/sessions']){r=await request(app).get(path).set(bearer(tok));assert.equal(r.status,403,path);assert.equal(r.body.code,'PASSWORD_CHANGE_REQUIRED');}
+ r=await request(app).post('/api/auth/change-password').set(bearer(tok)).send({currentPassword:second,newPassword:'MyOwnNewPassw0rd!'});assert.equal(r.status,204);
+ const after_=await login('teacher@example.com','MyOwnNewPassw0rd!');assert.equal(after_.status,200);assert.equal(after_.body.user.mustChangePassword,false);
+ assert.equal((await request(app).get('/api/auth/schools').set(bearer(after_.body.accessToken))).status,200);
+});
+test('the existing admin-chosen reset also forces a change at next sign-in',async()=>{
+ const a=(await login('admin@example.com')).body.accessToken;
+ let r=await request(app).post(`/api/users/${teacher}/reset-password`).set(bearer(a)).send({newPassword:'AdminChosenPassw0rd!'});assert.equal(r.status,204);
+ r=await login('teacher@example.com','AdminChosenPassw0rd!');assert.equal(r.body.user.mustChangePassword,true);
+ assert.equal((await request(app).get('/api/auth/schools').set(bearer(r.body.accessToken))).status,403);
+});
