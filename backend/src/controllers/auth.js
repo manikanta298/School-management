@@ -22,6 +22,14 @@ export async function revokeSession(req,res) {
 }
 export async function logoutAll(req,res) {await auth.revokeAll(req.user.id);res.clearCookie('refreshToken',cookieOptions);res.status(204).end();}
 export async function loginHistory(req,res) {res.json({items:await auth.loginHistory(req.user.id)});}
+export async function adminRevokeSessions(req,res) {
+ if(!await auth.memberOfSchool(req.params.userId,req.schoolId)) throw auth.fail(404,'User not found in this school');
+ res.json({revoked:await auth.adminRevokeSessions(req.params.userId,req.schoolId)});
+}
+export async function adminLoginHistory(req,res) {
+ if(!await auth.memberOfSchool(req.params.userId,req.schoolId)) throw auth.fail(404,'User not found in this school');
+ res.json({items:await auth.adminLoginHistory(req.params.userId,req.schoolId)});
+}
 export async function logout(req,res) {
  if(req.cookies.refreshToken) await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE token_hash=$1',[auth.digest(req.cookies.refreshToken)]);
  res.clearCookie('refreshToken',cookieOptions);res.status(204).end();
