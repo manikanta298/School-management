@@ -1,9 +1,10 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { schemas,identifier,pagination } from '../validators/academic.js';
 import * as c from '../controllers/academic.js';
 export const academicRouter=Router();
-academicRouter.use(authenticate,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+academicRouter.use(authenticate,moduleAccess('academic',{convert:false}),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 academicRouter.param('resource',(req,res,next,value)=>Object.hasOwn(schemas,value)?next():res.status(404).json({message:'Unknown academic resource'}));
 academicRouter.param('id',(req,res,next,value)=>identifier.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));
 const validate=(req,res,next)=>{const result=schemas[req.params.resource].safeParse(req.body);if(!result.success)return res.status(400).json({message:'Invalid input',errors:result.error.flatten().fieldErrors});req.body=result.data;next();};

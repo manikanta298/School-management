@@ -1,5 +1,6 @@
+import { permissionsFor } from '../config/permissions.js';
 import { pool } from '../config/db.js';
-export const publicUser = u => ({id:u.id,name:u.name,email:u.email,role:u.role,active:u.active,mustChangePassword:Boolean(u.must_change_password)});
+export const publicUser = u => ({id:u.id,name:u.name,email:u.email,role:u.role,active:u.active,mustChangePassword:Boolean(u.must_change_password),permissions:permissionsFor(u.role)});
 export const byEmail = async email => (await pool.query('SELECT * FROM users WHERE email=$1',[email])).rows[0];
 export const byId = async (id,schoolId=null) => (await pool.query(
  schoolId

@@ -8,7 +8,7 @@ export async function create(user,schoolId,data){const result=await model.create
 export async function payments(user,schoolId,id,query){await find(user,schoolId,id);return model.payments(user,schoolId,id,query);}
 export async function events(user,schoolId,id,query){await find(user,schoolId,id);return model.events(schoolId,id,query);}
 async function transaction(fn){const c=await pool.connect();try{await c.query('BEGIN');const result=await fn(c);await c.query('COMMIT');return result;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
-async function adminActor(c,user,schoolId){const {rows:[actor]}=await c.query('SELECT m.role,m.status,u.active FROM users u JOIN school_memberships m ON m.user_id=u.id AND m.school_id=$2 WHERE u.id=$1 FOR SHARE OF u,m',[user.id,schoolId]);if(!actor?.active||actor.status!=='active'||actor.role!=='admin')throw fail(403,'Active administrator required');}
+async function adminActor(c,user,schoolId){const {rows:[actor]}=await c.query('SELECT m.role,m.status,u.active FROM users u JOIN school_memberships m ON m.user_id=u.id AND m.school_id=$2 WHERE u.id=$1 FOR SHARE OF u,m',[user.id,schoolId]);if(!actor?.active||actor.status!=='active'||actor.role!==(user.realRole||'admin'))throw fail(403,'Active administrator required');}
 export async function pay(user,schoolId,id,data){return transaction(async c=>{
  await adminActor(c,user,schoolId);
  await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[schoolId+':'+data.idempotency_key]);

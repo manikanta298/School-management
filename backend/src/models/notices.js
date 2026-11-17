@@ -2,6 +2,7 @@ import { pool } from '../config/db.js';
 export const live="n.status='published' AND n.available_from<=CURRENT_TIMESTAMP AND (n.expires_at IS NULL OR n.expires_at>CURRENT_TIMESTAMP)";
 function scopeInner(user,values,preview=false){
  if(user.role==='admin')return preview?'true':live;
+ if(!['teacher','student','parent'].includes(user.role))return `${live} AND n.audience='all' AND n.class_id IS NULL`;
  values.push(user.role,user.id);const role=`$${values.length-1}`,uid=`$${values.length}`;
  let member;
  if(user.role==='teacher')member=`EXISTS(SELECT 1 FROM teacher_assignments a JOIN teachers t ON t.id=a.teacher_id WHERE a.class_id=n.class_id AND a.academic_year_id=n.academic_year_id AND t.user_id=${uid} AND t.employment_status='active')`;

@@ -1,11 +1,12 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { validate } from '../validators/auth.js';
 import * as v from '../validators/homework.js';
 import * as model from '../models/homework.js';
 import { fail } from '../services/auth.js';
 export const homeworkRouter=Router();
-homeworkRouter.use(authenticate,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+homeworkRouter.use(authenticate,moduleAccess('homework'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 homeworkRouter.param('id',(_req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));
 const staff=authorize('admin','teacher'),student=authorize('student');
 const visible=async(user,id)=>{const item=await model.find(user,id);if(!item)throw fail(404,'Homework not found');return item;};

@@ -1,10 +1,11 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { validate } from '../validators/auth.js';
 import * as v from '../validators/teachers.js';
 import * as c from '../controllers/teachers.js';
 export const teachersRouter=Router();
-teachersRouter.use(authenticate,authorize('admin','teacher'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+teachersRouter.use(authenticate,moduleAccess('teachers'),authorize('admin','teacher'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 for(const key of ['id','assignmentId'])teachersRouter.param(key,(req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));
 const admin=authorize('admin');
 const query=schema=>(req,res,next)=>{const parsed=schema.safeParse(req.query);if(!parsed.success)return res.status(400).json({message:'Invalid query'});req.teacherQuery=parsed.data;next();};

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { validate } from '../validators/auth.js';
 import * as v from '../validators/students.js';
@@ -9,7 +10,7 @@ const admin=authorize('admin');
 const page=(req,res,next)=>{const parsed=v.listQuery.safeParse(req.query);if(!parsed.success)return res.status(400).json({message:'Invalid query'});req.directoryQuery=parsed.data;next();};
 studentsRouter.get('/export.csv',authenticate,admin,async(req,res)=>{res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="students.csv"','Cache-Control':'no-store'});res.send(await exchange.exportCsv(req.schoolId));});
 for(const [router,kind,roles] of [[studentsRouter,'students',['admin','student','parent']],[parentsRouter,'parents',['admin','parent']]]){
- router.use(authenticate,authorize(...roles),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+ router.use(authenticate,moduleAccess(kind),(req,res,next)=>req.user.realRole&&(req.method==='DELETE'||/\/status$/.test(req.path)||/^\/(promote|bulk-update|export\.csv)/.test(req.path))?res.status(403).json({message:'Administrator only'}):next(),authorize(...roles),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
  for(const key of ['id','parentId','enrollmentId'])router.param(key,(req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));
  router.get('/',page,c.list(kind));router.get('/:id',c.find(kind));
  router.post('/',admin,validate(kind==='students'?v.studentCreate:v.parentCreate),c.save(kind));
