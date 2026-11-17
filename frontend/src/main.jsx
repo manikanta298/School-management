@@ -17,6 +17,7 @@ import Timetable from './pages/Timetable';
 import Notices from './pages/Notices';
 import Dashboard from './pages/Dashboard';
 import SecurityActivity from './pages/SecurityActivity';
+import { STAFF_ROLES,ROLE_LABELS,can,asModule } from './api/permissions';
 function App(){
  const [user,setUser]=useState(null),[loading,setLoading]=useState(true),[page,setPage]=useState('dashboard'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[users,setUsers]=useState([]),[offset,setOffset]=useState(0),[focusedNotice,setFocusedNotice]=useState(null);
  const [schools,setSchools]=useState([]),[activeSchoolId,setActiveSchoolId]=useState(null);
@@ -28,6 +29,7 @@ function App(){
  async function login(e){e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));await run(async()=>{const d=await api('/auth/login',{method:'POST',body});setUser(d.user);loadSchools();setPage('dashboard');});}
  async function switchSchool(id){await run(async()=>{const d=await api('/auth/switch-school',{method:'POST',body:{school_id:id}});setUser(d.user);setActiveSchoolId(d.activeSchoolId);setUsers([]);setPage('dashboard');await loadSchools();});}
  async function issueTemporary(u){if(!window.confirm(`Issue a temporary password for ${u.email}? Their current password stops working and all their sessions end.`))return;await run(async()=>{const d=await api(`/users/${u.id}/temporary-password`,{method:'POST'});setNotice(`Temporary password for ${u.email}: ${d.temporaryPassword} — shown once. They must change it at next sign-in.`);});}
+ async function forceSignOut(u){if(!window.confirm(`Sign ${u.email} out of every device in this school?`))return;await run(async()=>{const d=await api(`/auth/admin/users/${u.id}/revoke-sessions`,{method:'POST'});setNotice(`${d.revoked} session(s) ended for ${u.email}.`);});}
  async function logout(){await run(async()=>{await api('/auth/logout',{method:'POST'});clearToken();setUser(null);setUsers([]);});}
  async function change(e){e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));await run(async()=>{await api('/auth/change-password',{method:'POST',body});clearToken();setUser(null);setNotice('Password changed. Sign in again.');});}
  async function create(e){e.preventDefault();const form=e.currentTarget,body=Object.fromEntries(new FormData(form));await run(async()=>{await api('/users',{method:'POST',body});form.reset();await loadUsers();setNotice('Account created. Share credentials securely.');});}
@@ -38,21 +40,23 @@ function App(){
  return <AppShell key={activeSchoolId} user={user} page={page} onNavigate={navigate} onLogout={logout} busy={busy} schools={schools} activeSchoolId={activeSchoolId} onSwitchSchool={switchSchool}>
  {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status" className="notice">{notice}</p>}
  {!user?<section className="login"><p className="eyebrow">SCHOOL PORTAL</p><h1>Welcome back</h1><p>Sign in with your school account.</p><form onSubmit={login}>{field('email','Email','email')}<label>Password<input name="password" type="password" required autoComplete="current-password"/></label><button disabled={busy}>{busy?'Signing in…':'Sign in'}</button></form><p>Need an account or password reset? Contact your school administrator.</p></section>:<>
- {page==='notices'&&<Notices user={user} initialId={focusedNotice}/>}
- {page==='timetable'&&<Timetable user={user}/>}
- {page==='exams'&&<Exams user={user}/>}
- {page==='fees'&&user.role!=='teacher'&&<Fees user={user}/>}
- {page==='attendance'&&<Attendance user={user}/>}
- {page==='teachers'&&['admin','teacher'].includes(user.role)&&<Teachers user={user}/>}
- {page==='students'&&user.role!=='teacher'&&<StudentsParents user={user}/>}
- {page==='calendar'&&<Calendar user={user}/>}
- {page==='transport'&&user.role!=='teacher'&&<Transport user={user}/>}
- {page==='homework'&&<Homework user={user}/>}
- {page==='staff'&&user.role==='admin'&&<Staff/>}
- {page==='academic'&&<AcademicSetup user={user}/>}
- {page==='dashboard'&&<Dashboard user={user} onNavigate={target=>{if(target==='users')run(async()=>{await loadUsers();setPage('users');});else{if(target==='notices')setFocusedNotice(null);setPage(target);}}} onOpenNotice={id=>{setFocusedNotice(id);setPage('notices');}}/>}
+ {asModule(user,page).readOnly&&<p role="note" className="notice">Read-only access: changes are disabled for your role.</p>}
+ {page==='notices'&&<Notices user={asModule(user,'notices',{needManage:true})} initialId={focusedNotice}/>}
+ {page==='timetable'&&<Timetable user={asModule(user,'timetable')}/>}
+ {page==='exams'&&<Exams user={asModule(user,'exams')}/>}
+ {page==='fees'&&user.role!=='teacher'&&<Fees user={asModule(user,'fees')}/>}
+ {page==='attendance'&&<Attendance user={asModule(user,'attendance')}/>}
+ {page==='teachers'&&['admin','teacher'].includes(asModule(user,'teachers').role)&&<Teachers user={asModule(user,'teachers')}/>}
+ {page==='students'&&user.role!=='teacher'&&<StudentsParents user={asModule(user,'students')}/>}
+ {page==='calendar'&&<Calendar user={asModule(user,'calendar',{needManage:true})}/>}
+ {page==='transport'&&user.role!=='teacher'&&<Transport user={asModule(user,'transport')}/>}
+ {page==='homework'&&<Homework user={asModule(user,'homework')}/>}
+ {page==='staff'&&asModule(user,'staff').role==='admin'&&<Staff/>}
+ {page==='academic'&&<AcademicSetup user={asModule(user,'academic',{needManage:true})}/>}
+ {page==='dashboard'&&STAFF_ROLES.includes(user.role)&&!can(user,'dashboard')&&<section><h1>Welcome, {user.name}</h1><p>Use the menu to open the areas your {ROLE_LABELS[user.role]} role can access.</p></section>}
+ {page==='dashboard'&&!(STAFF_ROLES.includes(user.role)&&!can(user,'dashboard'))&&<Dashboard user={asModule(user,'dashboard')} onNavigate={target=>{if(target==='users')run(async()=>{await loadUsers();setPage('users');});else{if(target==='notices')setFocusedNotice(null);setPage(target);}}} onOpenNotice={id=>{setFocusedNotice(id);setPage('notices');}}/>}
  {page==='password'&&<section><h1>Change password</h1>{user.mustChangePassword&&<p role="alert">Your password was issued by an administrator. Choose a new password to continue.</p>}<form onSubmit={change}>{field('currentPassword','Current password','password')}{field('newPassword','New password (12+ characters, maximum 72 UTF-8 bytes)','password',12)}<button disabled={busy}>Update password and sign out</button></form><SecurityActivity onSignedOut={()=>{clearToken();setUser(null);setUsers([]);setSchools([]);}}/></section>}
- {page==='users'&&user.role==='admin'&&<section><h1>Manage users</h1><div className="grid"><div className="card"><h2>Create account</h2><form onSubmit={create}>{field('name','Full name')}{field('email','Email','email')}{field('password','Initial password (12+ characters)','password',12)}<label>Role<select name="role">{['teacher','student','parent','admin'].map(r=><option key={r}>{r}</option>)}</select></label><button disabled={busy}>Create account</button></form></div><div><h2>Accounts</h2>{users.map(u=><article className="card" key={u.id}><h3>{u.name}</h3><p>{u.email} · {u.role}</p><details><summary>Reset password</summary><button type="button" disabled={busy||u.id===user.id} onClick={()=>issueTemporary(u)}>Issue temporary password</button> <form onSubmit={e=>reset(e,u.id)}>{field('newPassword','New password','password',12)}<button disabled={busy}>Reset and revoke sessions</button></form></details></article>)}<button disabled={busy||offset===0} onClick={()=>run(()=>loadUsers(Math.max(0,offset-25)))}>Previous</button> <button disabled={busy||users.length<25} onClick={()=>run(()=>loadUsers(offset+25))}>Next</button></div></div></section>}
+ {page==='users'&&user.role==='admin'&&<section><h1>Manage users</h1><div className="grid"><div className="card"><h2>Create account</h2><form onSubmit={create}>{field('name','Full name')}{field('email','Email','email')}{field('password','Initial password (12+ characters)','password',12)}<label>Role<select name="role">{['teacher','student','parent','admin',...STAFF_ROLES].map(r=><option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select></label><button disabled={busy}>Create account</button></form></div><div><h2>Accounts</h2>{users.map(u=><article className="card" key={u.id}><h3>{u.name}</h3><p>{u.email} · {u.role}</p><details><summary>Reset password</summary><button type="button" disabled={busy||u.id===user.id} onClick={()=>forceSignOut(u)}>Force sign-out</button> <button type="button" disabled={busy||u.id===user.id} onClick={()=>issueTemporary(u)}>Issue temporary password</button> <form onSubmit={e=>reset(e,u.id)}>{field('newPassword','New password','password',12)}<button disabled={busy}>Reset and revoke sessions</button></form></details></article>)}<button disabled={busy||offset===0} onClick={()=>run(()=>loadUsers(Math.max(0,offset-25)))}>Previous</button> <button disabled={busy||users.length<25} onClick={()=>run(()=>loadUsers(offset+25))}>Next</button></div></div></section>}
  </> }</AppShell>;
 }
 createRoot(document.getElementById('root')).render(<App/>);

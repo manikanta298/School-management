@@ -1,11 +1,12 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { validate } from '../validators/auth.js';
 import * as v from '../validators/staff.js';
 import * as model from '../models/staff.js';
 import { fail } from '../services/auth.js';
 export const staffRouter=Router();
-staffRouter.use(authenticate,authorize('admin'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+staffRouter.use(authenticate,moduleAccess('staff'),authorize('admin'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 staffRouter.param('id',(_req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));
 const found=async(schoolId,id)=>{const item=await model.find(schoolId,id);if(!item)throw fail(404,'Record not found');return item;};
 staffRouter.get('/',async(req,res)=>{const q=v.listQuery.safeParse(req.query);if(!q.success)return res.status(400).json({message:'Invalid query'});res.json({items:await model.list(req.schoolId,q.data)});});

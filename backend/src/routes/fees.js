@@ -1,11 +1,12 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { validate } from '../validators/auth.js';
 import * as v from '../validators/fees.js';
 import * as c from '../controllers/fees.js';
 import * as reports from '../models/feeReports.js';
 export const feesRouter=Router();
-feesRouter.use(authenticate,authorize('admin','student','parent'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+feesRouter.use(authenticate,moduleAccess('fees'),authorize('admin','student','parent'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 const admin=authorize('admin');
 for(const key of ['id','paymentId'])feesRouter.param(key,(req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));
 const query=schema=>(req,res,next)=>{const result=schema.safeParse(req.query);if(!result.success)return res.status(400).json({message:'Invalid query'});req.feeQuery=result.data;next();};

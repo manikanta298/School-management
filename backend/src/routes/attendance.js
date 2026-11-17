@@ -1,10 +1,11 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { validate } from '../validators/auth.js';
 import * as v from '../validators/attendance.js';
 import * as c from '../controllers/attendance.js';
 export const attendanceRouter=Router();
-attendanceRouter.use(authenticate,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+attendanceRouter.use(authenticate,moduleAccess('attendance'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 const staff=authorize('admin','teacher');
 const query=schema=>(req,res,next)=>{const parsed=schema.safeParse(req.query);if(!parsed.success)return res.status(400).json({message:'Invalid dates, range or pagination. Choose up to 366 inclusive days.'});req.attendanceQuery=parsed.data;next();};
 attendanceRouter.param('id',(req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid student ID'}));

@@ -1,10 +1,11 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { validate } from '../validators/auth.js';
 import * as v from '../validators/exams.js';
 import * as c from '../controllers/exams.js';
 export const examsRouter=Router();
-examsRouter.use(authenticate,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+examsRouter.use(authenticate,moduleAccess('exams'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 const admin=authorize('admin'),staff=authorize('admin','teacher');
 const query=schema=>(req,res,next)=>{const p=schema.safeParse(req.query);if(!p.success)return res.status(400).json({message:'Invalid query'});req.examQuery=p.data;next();};
 for(const key of ['id','paperId','studentId'])examsRouter.param(key,(req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));

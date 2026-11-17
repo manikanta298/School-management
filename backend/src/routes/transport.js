@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { validate } from '../validators/auth.js';
 import * as v from '../validators/transport.js';
@@ -6,7 +7,7 @@ import * as model from '../models/transport.js';
 import { fail } from '../services/auth.js';
 export const transportRouter=Router();
 const admin=authorize('admin');
-transportRouter.use(authenticate,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+transportRouter.use(authenticate,moduleAccess('transport'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 for(const key of ['id','stopId'])transportRouter.param(key,(_req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));
 const query=schema=>(req,res,next)=>{const r=schema.safeParse(req.query);if(!r.success)return res.status(400).json({message:'Invalid query'});req.q=r.data;next();};
 const found=(item,message='Record not found')=>{if(!item)throw fail(404,message);return item;};

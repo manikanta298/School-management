@@ -1627,3 +1627,10 @@ BEGIN NEW.receipt_number := next_school_number(NEW.school_id,'receipt'); RETURN 
 CREATE TRIGGER fee_invoices_number BEFORE INSERT ON fee_invoices FOR EACH ROW EXECUTE FUNCTION assign_invoice_number();
 CREATE TRIGGER fee_payments_number BEFORE INSERT ON fee_payments FOR EACH ROW EXECUTE FUNCTION assign_receipt_number();
 ALTER TABLE users ADD COLUMN must_change_password boolean NOT NULL DEFAULT false;
+-- Adds Principal, Accountant, Receptionist, Librarian and Transport Manager roles.
+ALTER TABLE users DROP CONSTRAINT users_role_check;
+ALTER TABLE users ALTER COLUMN role TYPE varchar(20);
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','principal','accountant','receptionist','librarian','transport_manager','teacher','student','parent'));
+ALTER TABLE school_memberships DROP CONSTRAINT school_memberships_role_check;
+ALTER TABLE school_memberships ALTER COLUMN role TYPE varchar(20);
+ALTER TABLE school_memberships ADD CONSTRAINT school_memberships_role_check CHECK (role IN ('admin','principal','accountant','receptionist','librarian','transport_manager','teacher','student','parent'));

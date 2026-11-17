@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { moduleAccess } from '../middleware/permissions.js';
 import { pool } from '../config/db.js';
 import { authenticate,authorize } from '../middleware/auth.js';
 import { validate } from '../validators/auth.js';
@@ -7,7 +8,7 @@ import { fail } from '../services/auth.js';
 export const calendarRouter=Router();
 const admin=authorize('admin');
 const columns='id,title,description,event_type,starts_on::text AS starts_on,ends_on::text AS ends_on';
-calendarRouter.use(authenticate,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+calendarRouter.use(authenticate,moduleAccess('calendar'),(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 calendarRouter.param('id',(_req,res,next,value)=>v.id.safeParse(value).success?next():res.status(400).json({message:'Invalid record ID'}));
 // Events overlapping the range are returned; the default window starts today.
 calendarRouter.get('/',async(req,res)=>{
