@@ -6,3 +6,5 @@ export const createUser = z.object({name:z.string().trim().min(1).max(100).regex
 export const changePassword = z.object({currentPassword:z.string().min(1).max(200),newPassword:password}).strict();
 export const resetPassword = z.object({newPassword:password}).strict();
 export function validate(schema) {return (req,res,next)=>{const parsed=schema.safeParse(req.body);if(!parsed.success) return res.status(400).json({message:'Invalid input',errors:parsed.error.flatten().fieldErrors});req.body=parsed.data;next();};}
+
+export const switchSchool=z.object({school_id:z.string().uuid()}).strict();

@@ -16,6 +16,7 @@ for(const [router,kind,roles] of [[studentsRouter,'students',['admin','student',
  router.put('/:id',admin,validate(kind==='students'?v.studentUpdate:v.parentUpdate),c.save(kind));
  router.delete('/:id',admin,c.remove(kind));
 }
+studentsRouter.post('/promote',admin,validate(v.promote),async(req,res)=>res.json(await exchange.promote(req.schoolId,req.body)));
 studentsRouter.post('/bulk-update',admin,validate(v.bulkUpdate),async(req,res)=>res.json(await exchange.bulkUpdate(req.schoolId,req.body)));
 studentsRouter.get('/:id/parents',page,c.links);
 studentsRouter.post('/:id/parents',admin,validate(v.link),c.addLink);

@@ -22,3 +22,5 @@ const exportedReferenceFields={name:z.string().trim().min(1).max(100).optional()
 const bulkRowSchema=z.object({admission_number:studentFields.admission_number,...exportedReferenceFields,...Object.fromEntries(updatable.map(k=>[k,studentFields[k]]))}).strict();
 export const bulkUpdate=z.object({dry_run:z.boolean().default(true),rows:z.array(z.record(z.string(),z.unknown())).min(1).max(200)}).strict();
 export const parseBulkRow=raw=>bulkRowSchema.safeParse(raw);
+
+export const promote=z.object({dry_run:z.boolean().default(true),to_academic_year_id:id,enrolled_on:date.optional(),moves:z.array(z.object({student_id:id,section_id:id}).strict()).min(1).max(200)}).strict();

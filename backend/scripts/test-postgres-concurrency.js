@@ -55,6 +55,28 @@ try{
  const load=(await testPool.query('SELECT count(*)::int AS total FROM transport_allocations a JOIN transport_stops s ON s.id=a.stop_id JOIN transport_routes r ON r.id=s.route_id WHERE r.vehicle_id=$1 AND a.academic_year_id=$2',[vehicle,year])).rows[0].total;
  assert.equal(load,1,'committed vehicle load must not exceed capacity');
  process.stdout.write('PostgreSQL transport capacity race: passed (one commit, one capacity rejection).\n');
+
+ // Fee payments: concurrent payments must never exceed the invoice balance; receipts stay unique; idempotency keys dedupe.
+ const adminUser=(await insert("INSERT INTO users(name,email,password_hash,role) VALUES('Fee admin','fee-admin@example.test','test-hash','admin') RETURNING id",[])).id;
+ const klass=(await insert('INSERT INTO classes(name,academic_year_id,school_id) VALUES($1,$2,$3) RETURNING id',['Fee class',year,schoolId])).id;
+ const section=(await insert('INSERT INTO sections(name,class_id,capacity,school_id) VALUES($1,$2,40,$3) RETURNING id',['A',klass,schoolId])).id;
+ const enrollment=(await insert("INSERT INTO enrollments(student_id,academic_year_id,class_id,section_id,enrolled_on,status,school_id) VALUES($1,$2,$3,$4,CURRENT_DATE-1,'active',$5) RETURNING id",[studentIds[2],year,klass,section,schoolId])).id;
+ const structure=(await insert('INSERT INTO fee_structures(class_id,academic_year_id,name,amount_minor,school_id) VALUES($1,$2,$3,10000,$4) RETURNING id',[klass,year,'Tuition',schoolId])).id;
+ const invoice=(await insert("INSERT INTO fee_invoices(student_id,fee_structure_id,enrollment_id,class_id,academic_year_id,title,amount_minor,currency,issued_on,due_on,created_by,school_id) VALUES($1,$2,$3,$4,$5,'Tuition',10000,'INR',CURRENT_DATE-1,CURRENT_DATE+10,$6,$7) RETURNING id",[studentIds[2],structure,enrollment,klass,year,adminUser,schoolId])).id;
+ const pay=(amount,key=null)=>testPool.query("INSERT INTO fee_payments(invoice_id,amount_minor,paid_on,method,idempotency_key,recorded_by,school_id) VALUES($1,$2,CURRENT_DATE,'cash',COALESCE($3::uuid,gen_random_uuid()),$4,$5) RETURNING receipt_number",[invoice,amount,key,adminUser,schoolId]);
+ const attempts=await Promise.allSettled(Array.from({length:6},()=>pay(4000)));
+ const accepted=attempts.filter(r=>r.status==='fulfilled'),refused=attempts.filter(r=>r.status==='rejected');
+ assert.equal(accepted.length,2,'only two 4000 payments fit into a 10000 invoice');
+ assert.ok(refused.every(r=>r.reason.code==='23514'),'overpayments are rejected by the payment guard');
+ const paid=Number((await testPool.query('SELECT coalesce(sum(amount_minor),0) AS total FROM fee_payments WHERE invoice_id=$1 AND reversed_at IS NULL',[invoice])).rows[0].total);
+ assert.equal(paid,8000,'collected amount must never exceed the invoice');
+ const receipts=accepted.map(r=>r.value.rows[0].receipt_number);assert.equal(new Set(receipts).size,receipts.length,'receipt numbers are unique');
+ const key='11111111-1111-4111-8111-111111111111';
+ const replays=await Promise.allSettled([pay(1000,key),pay(1000,key),pay(1000,key)]);
+ assert.equal(replays.filter(r=>r.status==='fulfilled').length,1,'one payment per idempotency key');
+ assert.ok(replays.filter(r=>r.status==='rejected').every(r=>r.reason.code==='23505'));
+ assert.equal(Number((await testPool.query('SELECT sum(amount_minor) AS total FROM fee_payments WHERE invoice_id=$1 AND reversed_at IS NULL',[invoice])).rows[0].total),9000);
+ process.stdout.write('PostgreSQL fee payment race: passed (no overpayment, unique receipts, idempotent replays).\n');
 }finally{
  try{if(testPool)await testPool.end();}
  finally{if(adminConnected){try{if(schemaCreated)await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);}finally{await admin.end();}}}

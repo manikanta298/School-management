@@ -85,3 +85,14 @@ test('transfers change visibility immediately and history is protected',async()=
  let r=await call('get','homework',undefined,'s3');assert.equal(r.body.items.length,0);
  await assert.rejects(query('DELETE FROM sections WHERE id=$1',[ids.c]),e=>e.code==='23503');
 });
+
+test('homework is isolated between schools',async()=>{
+ const {rows:[sb]}=await query("INSERT INTO schools(name,slug) VALUES('School B','school-b-hw') RETURNING id");
+ const adminB=await insert('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id',['adminB','adminb@example.com',hash,'admin']);
+ await query("INSERT INTO school_memberships(school_id,user_id,role,status,is_default) VALUES($1,$2,'admin','active',true)",[sb.id,adminB]);
+ const login=await request(app).post('/api/auth/login').send({email:'adminb@example.com',password:'HomeworkPassword!123'});assert.equal(login.status,200);tokens.adminB=login.body.accessToken;
+ let r=await call('get','homework',null,'adminB');assert.equal(r.status,200);assert.equal(r.body.items.length,0);
+ r=await call('get',`homework/${ids.hw}`,null,'adminB');assert.equal(r.status,404);
+ r=await call('delete',`homework/${ids.hw}`,null,'adminB');assert.ok([403,404].includes(r.status));
+ r=await call('get',`homework/${ids.hw}`);assert.equal(r.status,200);
+});

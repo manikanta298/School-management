@@ -147,3 +147,21 @@ test('fees are isolated between schools and cannot reference another school',asy
  await assert.rejects(query(`INSERT INTO fee_invoices(school_id,student_id,fee_structure_id,enrollment_id,class_id,academic_year_id,title,amount_minor,currency,issued_on,due_on,created_by) SELECT $1,s.id,f.id,e.id,f.class_id,f.academic_year_id,f.name,f.amount_minor,f.currency,CURRENT_DATE,CURRENT_DATE,$2 FROM fee_structures f JOIN enrollments e ON e.class_id=f.class_id JOIN students s ON s.id=e.student_id WHERE f.id=$3 AND s.id=$4 AND e.status='active' LIMIT 1`,[schoolB,adminB,fee2,ids.sA2]),/violates foreign key constraint "fee_invoices_(student|structure|enrollment|class|year)_same_school_fk"/);
  await assert.rejects(query("INSERT INTO fee_payments(school_id,invoice_id,amount_minor,paid_on,method,idempotency_key,recorded_by) VALUES($1,$2,1,CURRENT_DATE,'cash',$3,$4)",[schoolB,invA,randomUUID(),adminB]),/violates foreign key constraint "fee_payments_invoice_same_school_fk"/);
 });
+
+test('receipts show school, student, payment and balance with the same access rules as invoices',async()=>{
+ const inv=ids.reissued,url=(p)=>`invoices/${inv}/payments/${p}/receipt`;
+ let r=await call('get',`invoices/${inv}`);assert.equal(r.status,200);const base=r.body.item.paid_minor,total=r.body.item.amount_minor;
+ r=await call('post',`invoices/${inv}/payments`,payment(3000));assert.equal(r.status,200,JSON.stringify(r.body));const first=r.body.payment_id;
+ r=await call('post',`invoices/${inv}/payments`,payment(2000));assert.equal(r.status,200);const second=r.body.payment_id;
+ r=await call('get',url(second));assert.equal(r.status,200,JSON.stringify(r.body));
+ const x=r.body.item;
+ assert.equal(x.amount_minor,2000);assert.equal(x.invoice_amount_minor,total);assert.equal(x.paid_to_date_minor,base+5000);assert.equal(x.balance_after_minor,total-base-5000);
+ assert.equal(x.reversed_at,null);assert.ok(x.school_name&&x.student_name&&x.admission_number&&x.receipt_number&&x.invoice_number);assert.equal(x.recorded_by,undefined);assert.equal(x.idempotency_key,undefined);
+ r=await call('get',url(first));assert.equal(r.body.item.paid_to_date_minor,base+3000);assert.equal(r.body.item.balance_after_minor,total-base-3000);
+ for(const who of ['parent','s1','s2','outsider','teacher']){const invoiceStatus=(await call('get',`invoices/${inv}`,null,who)).status;r=await call('get',url(second),null,who);assert.equal(r.status,invoiceStatus,`${who} receipt access must match invoice access`);if(r.status===200)assert.equal(r.body.item.balance_after_minor,total-base-5000);}
+ r=await call('get',url(second),null,'s1');assert.equal(r.status,200);
+ for(const who of ['outsider','s2','teacher']){r=await call('get',url(second),null,who);assert.notEqual(r.status,200,who);}
+ r=await call('get',url('00000000-0000-4000-8000-000000000000'));assert.equal(r.status,404);
+ r=await call('get',url('not-an-id'));assert.equal(r.status,400);
+ r=await request(app).get(`/api/fees/${url(second)}`);assert.equal(r.status,401);
+});
